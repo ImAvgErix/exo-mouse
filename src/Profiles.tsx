@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, type Step, type useMouse } from './mouse'
 import { call, onHostEvent, tell } from './exo-hid'
+import { GamePicker, LinkedCovers, type Game } from './GamePicker'
 import { Panel } from './ui'
 
 type Client = ReturnType<typeof useMouse>['client']
 /** games: the Exo game ids this profile is for; it applies while one of them runs. */
 type Profile = { id: string; name: string; steps: Step[]; savedAt: string; games?: string[] }
-type Game = { id: string; title: string }
 
 const KEY = 'exo-mouse.profiles.v1'
 
@@ -116,12 +116,12 @@ export function Profiles({ device, status, client, applyAll, busy }: {
 
   const [games, setGames] = useState<Game[]>([])
   const [linking, setLinking] = useState<string | null>(null)
-  const [filter, setFilter] = useState('')
   useEffect(() => {
     call('exo.games')
       .then(r => setGames((r as unknown as { games?: Game[] }).games ?? []))
       .catch(() => setGames([]))
   }, [])
+  const byId = new Map(games.map(g => [g.id, g]))
   const titles = new Map(games.map(g => [g.id, g.title]))
   const titlesNow = useRef(titles)
   titlesNow.current = titles
@@ -197,32 +197,25 @@ export function Profiles({ device, status, client, applyAll, busy }: {
             <span className="m-row-label">
               {p.name}
               {active(p) ? <span className="m-row-value is-good">Active</span> : null}
-              {p.games?.length ? <span className="m-row-value">{p.games.map(g => titles.get(g) ?? 'A removed game').join(', ')}</span> : null}
+              <LinkedCovers ids={p.games ?? []} games={byId} />
             </span>
           )}
           <span className="m-row-control m-actions">
             <button type="button" className="m-button" disabled={busy || active(p)} onClick={() => void apply(p)}>Apply</button>
-            <button type="button" className="m-link" aria-expanded={linking === p.id} onClick={() => { setLinking(l => l === p.id ? null : p.id); setFilter('') }}>Games</button>
+            <button type="button" className="m-link" aria-haspopup="dialog" onClick={() => setLinking(p.id)}>Games</button>
             <button type="button" className="m-link" onClick={() => { setRenaming(p.id); setDraft(p.name) }}>Rename</button>
             <button type="button" className="m-link" onClick={() => remove(p.id)}>{deleting === p.id ? 'Sure?' : 'Delete'}</button>
           </span>
         </div>
-        {linking === p.id ? (
-          <div className="m-games">
-            <input className="m-text" aria-label="Find a game" placeholder="Find a game" autoFocus value={filter} onChange={e => setFilter(e.target.value)} />
-            <div className="m-games-list" role="group" aria-label={`Games for ${p.name}`}>
-              {games.filter(g => g.title.toLowerCase().includes(filter.trim().toLowerCase())).map(g => (
-                <button key={g.id} type="button" role="checkbox" aria-checked={!!p.games?.includes(g.id)}
-                  className={`m-game${p.games?.includes(g.id) ? ' is-on' : ''}`} onClick={() => toggleGame(p, g.id)}>
-                  {g.title}
-                </button>
-              ))}
-              {games.length === 0 ? <span className="m-state">No installed games</span> : null}
-            </div>
-          </div>
-        ) : null}
         </div>
       ))}
+      {(() => {
+        const picking = list.find(p => p.id === linking)
+        return picking ? (
+          <GamePicker profile={picking} profiles={list} games={games}
+            onToggle={game => toggleGame(picking, game)} onClose={() => setLinking(null)} />
+        ) : null
+      })()}
       <div className="m-row">
         <input className="m-text" aria-label="New profile name" placeholder="Name" maxLength={40} value={name}
           onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }} />

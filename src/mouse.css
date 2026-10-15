@@ -420,36 +420,208 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-text:focus { border-color: #3a3a3a; }
 
-/* A profile's games: a search and the installed games as toggles. */
-.m-games {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 4px 0 14px;
+/* A profile's games beside its name: small covers, then a count. */
+.m-linked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
 }
 
-.m-games-list {
+.m-linked-cover {
+  display: block;
+  width: 20px;
+  height: 27px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #0d0d0d;
+  box-shadow: 0 0 0 1px var(--hair) inset;
+}
+
+.m-linked-cover.is-blank { font-size: 0; }
+
+.m-linked-more,
+.m-linked-name {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* The picker: the library's covers over the room, picked like Exo's own shelves. */
+.m-picker-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.78);
+  animation: m-fade 140ms var(--ease);
+}
+
+.m-picker {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 220px;
+  flex-direction: column;
+  width: min(1040px, 100%);
+  height: min(760px, 100%);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.m-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 26px 14px;
+}
+
+.m-picker-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.m-picker-count {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.m-picker-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 26px 16px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.m-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  align-content: start;
+  gap: 18px 14px;
+  padding: 20px 26px 28px;
   overflow-y: auto;
   scrollbar-width: none;
 }
 
-.m-game {
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--hair-control);
-  border-radius: 999px;
-  background: var(--bg);
+.m-picker-empty {
+  grid-column: 1 / -1;
+  margin: 24px 0;
   color: var(--muted);
+  text-align: center;
+}
+
+.m-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
 }
 
-.m-game.is-on {
-  border-color: var(--ink);
+.m-tile-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0d0d0d;
+  box-shadow: 0 0 0 1px var(--hair) inset;
+  transition: box-shadow 140ms var(--ease);
+}
+
+.m-tile-cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 140ms var(--ease);
+}
+
+.m-tile-cover.is-blank {
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.m-tile-title {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.m-tile.is-on .m-tile-art { box-shadow: 0 0 0 2px var(--ink) inset, 0 0 0 1px var(--ink); }
+.m-tile.is-on .m-tile-title { color: var(--ink); }
+
+.m-tile-check {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.m-tile-check::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 4px;
+  width: 5px;
+  height: 9px;
+  border: solid #000;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.m-tile.is-elsewhere .m-tile-cover { opacity: 0.45; }
+
+.m-tile-owner {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 7px;
+  overflow: hidden;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.8);
   color: var(--ink);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .m-tile:not(.is-on):hover .m-tile-art { box-shadow: 0 0 0 1px #3a3a3a inset; }
+  .m-tile:hover .m-tile-cover { opacity: 1; }
+}
+
+.m-button.is-primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #000;
+  font-weight: 600;
+}
+
+@keyframes m-fade { from { opacity: 0; } }
+
+/* A text field shows focus with its own edge, not a second ring around it. */
+.m-text:focus-visible {
+  outline: none;
+  border-color: var(--ink);
 }
 
 /* Signal: four bars and a word under the battery. */
