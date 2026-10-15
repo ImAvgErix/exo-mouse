@@ -53,6 +53,8 @@ async function findCandidates(): Promise<Candidate[]> {
 
 const REFRESH_VISIBLE_MS = 4_000
 const SETTLE_MS = 250
+const RETRY_VISIBLE_MS = 5_000
+const RETRY_HIDDEN_MS = 30_000
 /** Setters after which the mouse is no longer talking to this PC (Logitech Easy-Switch). */
 const LEAVES_THIS_PC = new Set(['requestHostSwitch'])
 const CONFIRM_MS = 800
@@ -70,7 +72,9 @@ export function useMouse() {
   const [state, setState] = useState<MouseState>({ phase: 'looking', candidates: [], current: null, brand: '', status: null, error: null, busy: false })
   const client = useRef<SupportedClient | null>(null)
   const writing = useRef(0)
-  const [visible, setVisible] = useState(true)
+  // Hidden until the room says otherwise: Exo starts this frame behind a closed room, and
+  // its first visibility message can land before this listener exists.
+  const [visible, setVisible] = useState(false)
   const [wanted, setWanted] = useState<string | null>(null)
   const [scan, setScan] = useState(0)
   /** One connect at a time: a rescan waits for the attempt before it, so two never share the device. */
@@ -137,6 +141,14 @@ export function useMouse() {
       // A wireless mouse asleep or out of range: the last status stays.
     }
   }, [])
+
+  // A mouse Exo could not reach (asleep, out of range, or Exo still starting) is tried
+  // again by itself: soon while the room is on screen, now and then behind it.
+  useEffect(() => {
+    if (state.phase !== 'error') return
+    const timer = window.setTimeout(() => setScan(n => n + 1), visible ? RETRY_VISIBLE_MS : RETRY_HIDDEN_MS)
+    return () => window.clearTimeout(timer)
+  }, [state.phase, visible])
 
   useEffect(() => {
     if (state.phase !== 'ready') return

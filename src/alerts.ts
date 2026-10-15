@@ -11,11 +11,19 @@ const SIGNAL_REPEAT_MS = 30 * 60 * 1000
 
 const charging = (s: MouseStatus) => s.batteryState.startsWith('Charging')
 
-/** Signal as 0-1: drivers report 1-4 bars (Finalmouse) or a percentage. */
+/**
+ * Signal as 0-1: drivers report 1-4 bars (Finalmouse) or a percentage. When a
+ * driver gives none but the link line carries dBm (a Starlight X reports link
+ * state 0 while connected, which the driver reads as no signal), the dBm is
+ * banded the way Finalmouse's own scale does: under 40, 50, 65 dB of loss.
+ */
 export function signalLevel(s: MouseStatus): number | null {
   const v = s.signalStrength
-  if (v == null || v < 0) return null
-  return v <= 4 ? v / 4 : Math.min(1, v / 100)
+  if (v != null && v >= 0) return v <= 4 ? v / 4 : Math.min(1, v / 100)
+  const dbm = /(-\d+)\s*dBm/.exec(s.connectionDetail ?? '')
+  if (!dbm) return null
+  const loss = Math.abs(Number(dbm[1]))
+  return loss < 40 ? 1 : loss < 50 ? 0.75 : loss < 65 ? 0.5 : 0.25
 }
 
 export function signalWord(level: number): string {
