@@ -1,0 +1,26 @@
+{
+  "name": "exo-mouse",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Exo Mouse: the Devices room's mouse settings, built on OpenMouse's protocol library.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/patch-protocol.mjs && tsc -b && vite build",
+    "check": "tsc -b",
+    "postinstall": "node scripts/patch-protocol.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "5.3.0",
+    "@openmouse/protocol": "0.42.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vite": "8.3.0"
+  }
+}

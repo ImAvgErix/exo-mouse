@@ -1,0 +1,479 @@
+/* Exo's look: void black, cream ink, Geist, hairlines and one pill. */
+:root {
+  --bg: #000;
+  --hair: #1c1c1c;
+  --hair-control: #242424;
+  --fill: #1c1c1c;
+  --ink: #eeeeee;
+  --muted: #999999;
+  --faint: #777777;
+  --good: #3dd68c;
+  --bad: #ff5c5c;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px/1.45 'Geist Variable', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ room */
+
+/* The mouse on the left, its settings filling the rest; only the settings scroll. */
+.m-room {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 56px;
+  height: 100%;
+  padding: 32px 40px 0;
+}
+
+.m-device {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.m-device-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 24px 40px rgba(255, 255, 255, 0.04));
+}
+
+.m-device-image.is-empty {
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+}
+
+.m-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  overflow-y: auto;
+  padding-bottom: 40px;
+  scrollbar-width: none;
+}
+
+.m-settings::-webkit-scrollbar { display: none; }
+
+
+.m-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.m-meta {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.m-battery {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-battery-bar {
+  position: relative;
+  width: 44px;
+  height: 14px;
+  border: 1px solid var(--hair-control);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.m-battery-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+.m-battery.is-low { color: var(--bad); }
+.m-battery.is-low .m-battery-bar > span { background: var(--bad); }
+
+.m-error {
+  margin: 0;
+  color: var(--bad);
+}
+
+.m-grid {
+  columns: 2 380px;
+  column-gap: 56px;
+}
+
+/* ------------------------------------------------------------------ panels and rows */
+
+.m-panel {
+  break-inside: avoid;
+  margin: 0 0 36px;
+}
+
+.m-panel-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.m-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 54px;
+  padding: 8px 0;
+  border-top: 1px solid var(--hair);
+}
+
+.m-dpi {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.m-dpi .m-slider { width: 200px; }
+
+.m-row-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.m-row-value {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.m-row-control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------ controls */
+
+.m-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+}
+
+.m-seg-item {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+
+.m-seg-item.is-on {
+  background: var(--fill);
+  color: var(--ink);
+}
+
+.m-seg-item:disabled { cursor: default; }
+
+@media (hover: hover) and (pointer: fine) {
+  .m-seg-item:not(.is-on):not(:disabled):hover { background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+}
+
+.m-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease), border-color 140ms var(--ease);
+}
+
+.m-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--muted);
+  transition: transform 140ms var(--ease), background-color 140ms var(--ease);
+}
+
+.m-switch.is-on {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 22%, transparent);
+}
+
+.m-switch.is-on .m-switch-knob {
+  transform: translateX(18px);
+  background: var(--ink);
+}
+
+.m-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 280px;
+}
+
+.m-slider input {
+  flex: 1;
+  height: 4px;
+  appearance: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ink) var(--fill), var(--hair-control) var(--fill));
+  cursor: pointer;
+}
+
+.m-slider input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  appearance: none;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.m-slider-value {
+  min-width: 64px;
+  color: var(--muted);
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 12px;
+  text-align: right;
+}
+
+.m-number {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  padding: 0 14px;
+}
+
+.m-number input {
+  width: 72px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.m-number-suffix { margin-left: 6px; color: var(--faint); }
+
+.m-stages {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.m-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.m-stage.is-on {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.m-stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.m-select {
+  height: 32px;
+  max-width: 260px;
+  padding: 0 12px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.m-color {
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--hair-control);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.m-button {
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .m-button:hover, .m-stage:not(.is-on):hover { background: rgba(255, 255, 255, 0.05); }
+}
+
+/* ------------------------------------------------------------------ states */
+
+.m-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+.m-center-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.m-center-line {
+  margin: 0 0 8px;
+  max-width: 420px;
+  color: var(--muted);
+}
+
+/* A value the mouse reports but does not let you change: a word on the right edge. */
+.m-state {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+
+.m-row-value.is-good { color: var(--good); }
+
+.m-actions { gap: 12px; align-items: center; }
+
+.m-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.m-link:hover { color: var(--ink); }
+
+.m-text {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+  outline: none;
+}
+
+.m-text:focus { border-color: #3a3a3a; }
+
+/* A profile's games: a search and the installed games as toggles. */
+.m-games {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 14px;
+}
+
+.m-games-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.m-game {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.m-game.is-on {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* Signal: four bars and a word under the battery. */
+.m-signal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.m-signal.is-weak { color: var(--bad); }
+
+.m-signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.m-signal-bars > span {
+  width: 4px;
+  border-radius: 1px;
+  background: var(--hair-control);
+}
+
+.m-signal-bars > span.is-on { background: currentColor; }
+.m-signal:not(.is-weak) .m-signal-bars > span.is-on { background: var(--ink); }

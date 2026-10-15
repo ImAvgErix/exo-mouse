@@ -1,0 +1,31 @@
+/* Core extras: the stage editor and colour wells, on Exo's rows. */
+
+.cx-stage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cx-stage .m-slider { width: 150px; }
+.cx-stage .m-slider-value { display: none; }
+
+.cx-color {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cx-color::-webkit-color-swatch-wrapper { padding: 0; }
+.cx-color::-webkit-color-swatch { border: 0; border-radius: 999px; }
+.cx-color:disabled { cursor: default; opacity: 0.5; }
+
+.cx-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

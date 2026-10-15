@@ -1,0 +1,29 @@
+/* ATK, LunaFury, Ninjutso, Incott and K-snake extras: only what ui.tsx lacks. */
+
+.am-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.am-select {
+  height: 32px;
+  max-width: 180px;
+  padding: 0 12px;
+  border: 1px solid var(--hair-control);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.am-select:disabled { opacity: 0.5; }
+
+.am-step .m-number input { width: 56px; }
+
+.am-recording .m-row-value { color: var(--bad); }
+
+.am-capture { outline: none; }
