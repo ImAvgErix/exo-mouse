@@ -649,3 +649,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-signal-bars > span.is-on { background: currentColor; }
 .m-signal:not(.is-weak) .m-signal-bars > span.is-on { background: var(--ink); }
+
+.m-row-tags {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.m-link:disabled { color: var(--faint); opacity: 0.5; cursor: default; }

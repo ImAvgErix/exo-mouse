@@ -7,7 +7,12 @@ import { Panel } from './ui'
 
 type Client = ReturnType<typeof useMouse>['client']
 /** games: the Exo game ids this profile is for; it applies while one of them runs. */
-type Profile = { id: string; name: string; steps: Step[]; savedAt: string; games?: string[] }
+/**
+ * isDefault marks Desktop: built in, always there, always first, the profile the
+ * mouse goes back to whenever no linked game is running. It is never renamed,
+ * deleted or linked to games; Update saves the mouse's current settings into it.
+ */
+type Profile = { id: string; name: string; steps: Step[]; savedAt: string; games?: string[]; isDefault?: boolean }
 
 const KEY = 'exo-mouse.profiles.v1'
 
@@ -75,6 +80,26 @@ export function snapshot(status: MouseStatus, client: Client): Step[] {
 
 const same = (a: Step[], b: Step[]) => JSON.stringify(a) === JSON.stringify(b)
 
+const DESKTOP = 'Desktop'
+const isDesktopName = (name: string) => name.trim().toLowerCase() === DESKTOP.toLowerCase()
+
+/**
+ * This mouse's profiles with Desktop in place: the one already marked, else one
+ * already called Desktop, else a new one from the settings the mouse has now.
+ * It comes first, with no games; any other profile marked default is not.
+ */
+function withDesktop(list: Profile[], now: Step[]): Profile[] {
+  const desktop = list.find(p => p.isDefault) ?? list.find(p => isDesktopName(p.name))
+    ?? { id: crypto.randomUUID(), name: DESKTOP, steps: now, savedAt: new Date().toISOString() }
+  const rest = list.filter(p => p.id !== desktop.id).map(p => p.isDefault ? { ...p, isDefault: false } : p)
+  return [{ ...desktop, name: DESKTOP, isDefault: true, games: [] }, ...rest]
+}
+
+/** How long a switch keeps trying while the mouse sleeps: every 3 s for a minute. */
+const LAND_TRIES = 20
+const LAND_CHECK_MS = 3_000
+const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms))
+
 /** Only the settings that differ from the mouse now: fewer writes, a faster switch. */
 export const changes = (target: Step[], now: Step[]) => target.filter(step => !now.some(n => JSON.stringify(n) === JSON.stringify(step)))
 
@@ -96,7 +121,7 @@ export function Profiles({ device, status, client, applyAll, busy }: {
   const [all, setAll] = useState<All>({})
   const [saveError, setSaveError] = useState<string | null>(null)
   useEffect(() => {
-    readAll().then(setAll).catch(() => setSaveError('Exo could not read your saved profiles.'))
+    readAll().then(all => { setAll(all); setLoaded(true) }).catch(() => setSaveError('Exo could not read your saved profiles.'))
   }, [])
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -130,28 +155,87 @@ export function Profiles({ device, status, client, applyAll, busy }: {
   const live = useRef({ list, now, applyAll })
   live.current = { list, now, applyAll }
   /** The game whose profile is on the mouse now, and the settings to put back after it. */
-  const session = useRef<{ game: string; before: Step[] } | null>(null)
+  /**
+   * The linked games running now, newest last, and the settings the mouse had
+   * before the first of them (put back when they all close and there is no
+   * default profile).
+   */
+  /**
+   * Writes a profile and keeps at it until the mouse has it. A sleeping wireless
+   * mouse drops writes while its receiver still answers reads, so a switch made
+   * while it sleeps lands when it wakes: checked every few seconds for a minute.
+   * The notice says so only once the mouse has the profile. A newer switch
+   * replaces an older one still waiting.
+   */
+  const landing = useRef(0)
+  const land = (steps: Step[], notice: string | null) => {
+    const ticket = ++landing.current
+    void (async () => {
+      for (let attempt = 0; attempt < LAND_TRIES; attempt++) {
+        if (landing.current !== ticket) return
+        const current = live.current.now
+        if (attempt > 0 && same(steps, current)) break
+        const took = await live.current.applyAll(attempt === 0 ? steps : changes(steps, current))
+        await sleep(LAND_CHECK_MS)
+        if (landing.current !== ticket) return
+        if (took && same(steps, live.current.now)) break
+        if (attempt === LAND_TRIES - 1) return
+      }
+      if (notice) tell({ notice })
+    })()
+  }
+
+  const running = useRef<string[]>([])
+  const before = useRef<Step[] | null>(null)
   useEffect(() => {
     onHostEvent('game.runState', data => {
       const d = data as { id?: string; isRunning?: boolean }
       if (!d.id) return
-      const { list: profiles, now: current, applyAll: write } = live.current
+      const { list: profiles, now: current } = live.current
       if (d.isRunning) {
-        if (session.current?.game === d.id) return
+        if (running.current.includes(d.id)) return
         const profile = profiles.find(p => p.games?.includes(d.id!))
         if (!profile) return
+        if (running.current.length === 0) before.current = current
+        running.current = [...running.current, d.id]
         // The room may be closed and the last read a minute old: write the whole profile.
-        session.current = { game: d.id, before: session.current?.before ?? current }
-        void write(profile.steps).then(took => { if (took) tell({ notice: `${profile.name} mouse profile on for ${titlesNow.current.get(d.id!) ?? 'your game'}.` }) })
-      } else if (session.current?.game === d.id) {
-        const before = session.current.before
-        session.current = null
-        void write(before).then(took => { if (took) tell({ notice: 'Your mouse settings are back.' }) })
+        land(profile.steps, `${profile.name} mouse profile on for ${titlesNow.current.get(d.id!) ?? 'your game'}.`)
+        return
+      }
+      if (!running.current.includes(d.id)) return
+      running.current = running.current.filter(g => g !== d.id)
+      // Another linked game still running keeps its profile; otherwise the default, else what was there before.
+      const still = [...running.current].reverse().map(g => profiles.find(p => p.games?.includes(g))).find(Boolean)
+      const fallback = profiles.find(p => p.isDefault)
+      if (still) {
+        land(still.steps, `${still.name} mouse profile on.`)
+      } else if (fallback) {
+        before.current = null
+        land(fallback.steps, `${fallback.name} mouse profile on.`)
+      } else if (before.current) {
+        const back = before.current
+        before.current = null
+        land(back, 'Your mouse settings are back.')
       }
     })
   }, [])
-  /** A game is linked to one profile at most: linking it here unlinks it elsewhere. */
+
+  // When the mouse connects (Exo starting, the mouse waking, a replug) with no
+  // linked game running, it takes the default profile, once per connection, quietly.
+  const [loaded, setLoaded] = useState(false)
+  const settled = useRef(false)
+  useEffect(() => {
+    if (!loaded || settled.current) return
+    settled.current = true
+    const fixed = withDesktop(list, now)
+    if (JSON.stringify(fixed) !== JSON.stringify(list)) save(fixed)
+    const desktop = fixed[0]
+    if (running.current.length === 0 && !same(desktop.steps, now)) land(desktop.steps, null)
+  }, [loaded, list, now, applyAll])
+
+  /** A game is linked to one profile at most (never Desktop): linking it here unlinks it elsewhere. */
   const toggleGame = (profile: Profile, game: string) => {
+    if (profile.isDefault) return
     const on = !profile.games?.includes(game)
     save(list.map(p => p.id === profile.id
       ? { ...p, games: on ? [...(p.games ?? []), game] : (p.games ?? []).filter(g => g !== game) }
@@ -164,20 +248,25 @@ export function Profiles({ device, status, client, applyAll, busy }: {
     setSaveError(null)
     writeAll(updated).catch(() => setSaveError('Exo could not save your profiles. Try again.'))
   }
+  /** Save current: a new profile, or the one with that name (Desktop included) updated to what the mouse has now. */
   const add = () => {
     const clean = name.trim().slice(0, 40)
     if (!clean) return
     const existing = list.find(p => p.name.toLowerCase() === clean.toLowerCase())
-    const profile: Profile = { id: existing?.id ?? crypto.randomUUID(), name: clean, steps: now, savedAt: new Date().toISOString() }
-    save(existing ? list.map(p => p.id === existing.id ? profile : p) : [...list, profile])
+    save(existing
+      ? list.map(p => p.id === existing.id ? { ...p, steps: now, savedAt: new Date().toISOString() } : p)
+      : [...list, { id: crypto.randomUUID(), name: clean, steps: now, savedAt: new Date().toISOString() }])
     setName('')
   }
+  const update = (id: string) => save(list.map(p => p.id === id ? { ...p, steps: now, savedAt: new Date().toISOString() } : p))
   const rename = (id: string) => {
     const clean = draft.trim().slice(0, 40)
-    if (clean) save(list.map(p => p.id === id ? { ...p, name: clean } : p))
+    // Desktop's name is taken: another profile cannot become it.
+    if (clean && !isDesktopName(clean)) save(list.map(p => p.id === id && !p.isDefault ? { ...p, name: clean } : p))
     setRenaming(null)
   }
   const remove = (id: string) => {
+    if (list.find(p => p.id === id)?.isDefault) return
     if (deleting !== id) { setDeleting(id); window.setTimeout(() => setDeleting(d => d === id ? null : d), 3000); return }
     save(list.filter(p => p.id !== id))
     setDeleting(null)
@@ -189,22 +278,33 @@ export function Profiles({ device, status, client, applyAll, busy }: {
       {list.map(p => (
         <div key={p.id}>
         <div className="m-row">
-          {renaming === p.id ? (
+          {renaming === p.id && !p.isDefault ? (
             <input className="m-text" aria-label="Profile name" autoFocus maxLength={40} value={draft}
               onChange={e => setDraft(e.target.value)} onBlur={() => rename(p.id)}
               onKeyDown={e => { if (e.key === 'Enter') rename(p.id); if (e.key === 'Escape') setRenaming(null) }} />
           ) : (
             <span className="m-row-label">
               {p.name}
-              {active(p) ? <span className="m-row-value is-good">Active</span> : null}
+              {active(p) || p.isDefault ? (
+                <span className="m-row-tags">
+                  {active(p) ? <span className="m-row-value is-good">Active</span> : null}
+                  {p.isDefault ? <span className="m-row-value">Default</span> : null}
+                </span>
+              ) : null}
               <LinkedCovers ids={p.games ?? []} games={byId} />
             </span>
           )}
           <span className="m-row-control m-actions">
             <button type="button" className="m-button" disabled={busy || active(p)} onClick={() => void apply(p)}>Apply</button>
-            <button type="button" className="m-link" aria-haspopup="dialog" onClick={() => setLinking(p.id)}>Games</button>
-            <button type="button" className="m-link" onClick={() => { setRenaming(p.id); setDraft(p.name) }}>Rename</button>
-            <button type="button" className="m-link" onClick={() => remove(p.id)}>{deleting === p.id ? 'Sure?' : 'Delete'}</button>
+            {p.isDefault ? (
+              <button type="button" className="m-link" disabled={active(p)} onClick={() => update(p.id)}>Update</button>
+            ) : (
+              <>
+                <button type="button" className="m-link" aria-haspopup="dialog" onClick={() => setLinking(p.id)}>Games</button>
+                <button type="button" className="m-link" onClick={() => { setRenaming(p.id); setDraft(p.name) }}>Rename</button>
+                <button type="button" className="m-link" onClick={() => remove(p.id)}>{deleting === p.id ? 'Sure?' : 'Delete'}</button>
+              </>
+            )}
           </span>
         </div>
         </div>
