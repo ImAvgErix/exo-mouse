@@ -65,10 +65,7 @@ export function GamePicker({ profile, profiles, games, onToggle, onClose }: {
     <div className="m-picker-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <section className="m-picker" role="dialog" aria-modal="true" aria-labelledby="m-picker-title">
         <header className="m-picker-head">
-          <div>
-            <h2 id="m-picker-title" className="m-picker-title">Games for {profile.name}</h2>
-            <p className="m-picker-count">{mine.size === 0 ? 'None linked yet' : `${mine.size} linked`}</p>
-          </div>
+          <h2 id="m-picker-title" className="m-picker-title">Games for {profile.name}</h2>
           <button type="button" className="m-button is-primary" onClick={onClose}>Done</button>
         </header>
         <div className="m-picker-tools">

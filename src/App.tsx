@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, useMouse } from './mouse'
 import type { Section } from './section'
-import { FinalmousePanels } from './Finalmouse'
+import { FinalmousePanels, finalmouseCustomLod } from './Finalmouse'
 import { AtkMiscPanels } from './brands/atk-misc'
 import { CoreExtrasPanels, coreExtrasReplaces } from './brands/core-extras'
 import { EndgamePulsarPanels } from './brands/endgame-pulsar'
@@ -11,18 +11,21 @@ import { MagneticToolsPanels } from './brands/magnetic-tools'
 import { Profiles } from './Profiles'
 import { deviceImage } from './device-images'
 import { signalLevel, signalWord, useMouseAlerts } from './alerts'
-import { useState } from 'react'
-import { NumberField, Panel, Row, Segmented, Select, Slider, Switch } from './ui'
-
+import { useColumns } from './columns'
+import { ColorField, NumberField, Panel, Row, Segmented, Select, Slider, Switch } from './ui'
 
 export function App() {
-  const mouse = useMouse()
+  return <Room mouse={useMouse()} />
+}
+
+/** The room for whatever state the mouse is in; App feeds it the real mouse. */
+export function Room({ mouse }: { mouse: ReturnType<typeof useMouse> }) {
   useMouseAlerts(mouse.phase === 'ready' ? mouse.status : null)
   if (mouse.phase === 'looking' || mouse.phase === 'opening') {
-    return <Centered title={mouse.phase === 'opening' ? `Connecting to ${mouse.current?.name ?? 'your mouse'}` : 'Looking for your mouse'} />
+    return <Centered title={mouse.phase === 'opening' ? `Connecting to ${mouse.current?.name ?? 'your mouse'}` : 'Looking for your mouse'} working />
   }
   if (mouse.phase === 'none') {
-    return <Centered title="No supported mouse found" line="Plug in your mouse or its receiver. Exo shows it here as soon as Windows sees it." />
+    return <Centered title="No supported mouse found" line="Plug in your mouse or its receiver." />
   }
   if (mouse.phase === 'error' || !mouse.status) {
     return (
@@ -34,7 +37,7 @@ export function App() {
   const section: Section = { status: mouse.status, client: mouse.client, apply: mouse.apply, applyAll: mouse.applyAll, busy: mouse.busy }
   return (
     <main className="m-room">
-      <Device status={mouse.status} brand={mouse.brand}>
+      <Device status={mouse.status} brand={mouse.brand} readAt={mouse.readAt} busy={mouse.busy} error={mouse.error}>
         {mouse.candidates.length > 1 ? (
           <Segmented
             label="Device"
@@ -44,9 +47,7 @@ export function App() {
           />
         ) : null}
       </Device>
-      <div className="m-settings">
-      {mouse.error ? <p className="m-error" role="alert">{mouse.error}</p> : null}
-      <div className="m-grid">
+      <Settings key={mouse.current?.id}>
         <Sensitivity {...section} />
         <CoreExtrasPanels {...section} />
         <Performance {...section} />
@@ -59,60 +60,209 @@ export function App() {
         <Lighting {...section} />
         <Power {...section} />
         {mouse.current ? <Profiles device={mouse.current.id} status={mouse.status} client={mouse.client} applyAll={mouse.applyAll} busy={mouse.busy} /> : null}
-      </div>
-      </div>
+      </Settings>
     </main>
   )
 }
 
-function Centered({ title, line, children }: { title: string; line?: string; children?: ReactNode }) {
+/** Columns a room can hold at most; one break ends each but the last. */
+const BREAKS = [0, 1, 2, 3, 4]
+
+/**
+ * The panels in balanced columns that fill the room (columns.ts); only they
+ * scroll, and only when they cannot fit. Each panel rises in turn (Exo's
+ * arrive, 28 ms apart, after the mouse) when a mouse opens; a later panel
+ * takes the next place.
+ */
+function Settings({ children }: { children: ReactNode }) {
+  const { box, grid } = useColumns()
+  useLayoutEffect(() => {
+    grid.current?.querySelectorAll<HTMLElement>(':scope > .m-panel').forEach((panel, i) => {
+      if (!panel.style.getPropertyValue('--i')) panel.style.setProperty('--i', String(i + 1))
+    })
+  })
   return (
-    <main className="m-center" role="status">
-      <p className="m-center-title">{title}</p>
+    <div ref={box} className="m-settings">
+      <div ref={grid} className="m-grid">
+        {children}
+        {BREAKS.map(i => <span key={i} className="m-break" aria-hidden="true" />)}
+      </div>
+    </div>
+  )
+}
+
+function Centered({ title, line, working = false, children }: { title: string; line?: string; working?: boolean; children?: ReactNode }) {
+  return (
+    <main className="m-center m-switch-in" role="status">
+      <p className={`m-center-title${working ? ' m-work-text' : ''}`}>{title}</p>
       {line ? <p className="m-center-line">{line}</p> : null}
       {children}
     </main>
   )
 }
 
-/** The mouse itself: its picture (OpenMouse's render, when there is one), name, link and battery. */
-function Device({ status, brand, children }: { status: MouseStatus; brand: string; children?: ReactNode }) {
-  const battery = status.batteryPercent
-  const charging = status.batteryState.startsWith('Charging')
+/** Every version the mouse reports, one per line ("Mouse 1.1.1", "Receiver RF 1.1.1"); the room calls the dongle the receiver. */
+function firmwareLines(status: MouseStatus): string[] {
+  return (status.firmware ?? []).map(v => v.trim().replace(/^Dongle\b/i, 'Receiver')).filter(Boolean)
+}
+
+/** A received-signal figure some drivers put in the link line ("2.4 GHz receiver · -42 dBm"); the hero shows it with the signal. */
+const DBM = /\s*[·,-]?\s*(-\d+)\s*dBm/
+
+/** How the mouse is linked, once: the driver's own words without the dBm, or Wired/Wireless when it gives none. */
+function linkLine(status: MouseStatus): string | null {
+  return status.connectionDetail?.replace(DBM, '').trim() || status.connectionType || null
+}
+
+/**
+ * The polling rate as a fact, when it is not a choice: the mouse fixes it
+ * (the Starlight X's PerfectPolling) and no brand panel draws it. A rate the
+ * user can pick stays in Performance.
+ */
+function fixedPollingRate(status: MouseStatus): number | null {
+  const fixed = !!status.ui?.pollingReadOnly || status.supportedPollingRates?.length === 0
+  return fixed && status.eggGlassMode !== true && status.pollingRateHz > 0 ? status.pollingRateHz : null
+}
+
+/** A read older than this (the room reads every few seconds) says when it was, so an asleep mouse's figures are not taken for live ones. */
+const STALE_MS = 30_000
+
+function ago(ms: number): string {
+  const min = Math.round(ms / 60_000)
+  return min < 1 ? 'under a minute ago' : min < 60 ? `${min} min ago` : `${Math.round(min / 60)} h ago`
+}
+
+/** The time since the last read, checked every 10 s while the hero is on screen. */
+function useStale(readAt: number): string | null {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 10_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const age = Math.max(now, readAt) - readAt
+  return readAt > 0 && age > STALE_MS ? `Last read ${ago(age)}` : null
+}
+
+/** How long Exo's done (the dim, the green ring, the check) holds after a change lands. */
+const DONE_MS = 3000
+
+/**
+ * A change just landed: true from the moment a write finishes without an
+ * error until the done motion has played. Each landing restarts it.
+ */
+function useLanded(busy: boolean, error: string | null): number {
+  const [landed, setLanded] = useState(0)
+  const was = useRef(busy)
+  const timer = useRef(0)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  useEffect(() => {
+    const finished = was.current && !busy
+    was.current = busy
+    if (!finished || error) return
+    setLanded(n => n + 1)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setLanded(0), DONE_MS)
+  }, [busy, error])
+  return landed
+}
+
+/**
+ * The mouse itself, as the room's hero: its picture large (OpenMouse's
+ * render, when there is one), its name and how it is linked, and a readout of
+ * what the mouse reports but nobody sets: battery, signal, a fixed polling
+ * rate and firmware. Each fact shows here once; settings live in the panels.
+ * A light band crosses the picture while a change is being written and a
+ * check draws when it lands; the last change that did not take floats at the
+ * picture's foot, so nothing moves.
+ */
+function Device({ status, brand, readAt, busy, error, children }: { status: MouseStatus; brand: string; readAt: number; busy: boolean; error: string | null; children?: ReactNode }) {
   const image = deviceImage(status.name)
   const [missing, setMissing] = useState<string | null>(null)
+  const landed = useLanded(busy, error)
+  const stale = useStale(readAt)
+  const shown = image && missing !== image ? image : null
+  const meta = [status.name.toLowerCase().includes(brand.toLowerCase()) ? null : brand, linkLine(status), stale].filter(Boolean).join(' · ')
+  const firmware = firmwareLines(status)
+  const polling = fixedPollingRate(status)
   return (
-    <aside className="m-device">
-      {image && missing !== image ? <img className="m-device-image" src={image} alt="" draggable={false} onError={() => setMissing(image)} /> : <span className="m-device-image is-empty" />}
-      <div>
-        <h1 className="m-name">{status.name}</h1>
-        <p className="m-meta">
-          {[brand, status.connectionType, status.connectionDetail].filter(Boolean).join(' · ')}
-        </p>
+    <aside className="m-hero m-arrive" style={{ '--i': 0 } as CSSProperties}>
+      {children ? <div className="m-hero-pick">{children}</div> : null}
+      <div className={`m-hero-art${busy ? ' m-work' : ''}`}>
+        {shown ? (
+          <>
+            <img className="m-hero-wash" src={shown} alt="" draggable={false} aria-hidden="true" />
+            <img className="m-hero-image" src={shown} alt="" draggable={false} onError={() => setMissing(shown)} />
+          </>
+        ) : <span className="m-hero-image is-empty" />}
+        {landed ? (
+          <span key={landed} className="m-done" aria-hidden="true">
+            <svg className="m-done-check" viewBox="0 0 24 24"><path d="M6 12.5 l4 4 l8 -9" /></svg>
+          </span>
+        ) : null}
+        {error ? <p className="m-error" role="alert">{error}</p> : null}
       </div>
-      {battery != null ? (
-        <div className={`m-battery${battery <= 15 && !charging ? ' is-low' : ''}`} aria-label={`Battery ${battery}%${charging ? ', charging' : ''}`}>
-          <span className="m-battery-bar"><span style={{ width: `${Math.max(4, battery)}%` }} /></span>
-          <span className="m-battery-text">{battery}%{charging ? ' · Charging' : ''}</span>
-        </div>
-      ) : null}
-      <Signal status={status} />
-      {children}
+      <div className="m-hero-id">
+        <h1 className="m-name">{status.name}</h1>
+        {meta ? <p className="m-meta">{meta}</p> : null}
+      </div>
+      <div className="m-stats">
+        <Battery status={status} />
+        <Signal status={status} />
+        {polling ? (
+          <div className="m-stat">
+            <span className="m-stat-label">Polling rate</span>
+            <span className="m-stat-figure">{polling}<span className="m-stat-unit">Hz</span></span>
+          </div>
+        ) : null}
+        {firmware.length ? (
+          <div className="m-stat">
+            <span className="m-stat-label">Firmware</span>
+            {firmware.map(line => <span key={line} className="m-stat-line">{line}</span>)}
+          </div>
+        ) : null}
+      </div>
     </aside>
   )
 }
 
-/** The wireless signal as four bars and a word; nothing on a wired mouse or one that does not report it. */
+/**
+ * The charge as a figure over a gauge, red when low. Beside its name, what
+ * the mouse says of it: Charging in green while it charges, Full or Almost
+ * full, otherwise the cell's voltage when the driver reads it.
+ */
+function Battery({ status }: { status: MouseStatus }) {
+  const battery = status.batteryPercent
+  if (battery == null) return null
+  const state = status.batteryState
+  const charging = state.startsWith('Charging')
+  const mv = status.batteryVoltageMv
+  const detail = charging ? <span className="m-stat-good">{state}</span>
+    : state === 'Full' || state === 'Almost full' ? <span className="m-stat-detail">{state}</span>
+      : mv ? <span className="m-stat-detail">{(mv / 1000).toFixed(2)} V</span> : null
+  return (
+    <div className={`m-stat${battery <= 15 && !charging ? ' is-low' : ''}`} aria-label={`Battery ${battery}%${charging ? ', charging' : ''}`}>
+      <span className="m-stat-label">Battery{detail}</span>
+      <span className="m-stat-figure">{battery}<span className="m-stat-unit">%</span></span>
+      <span className="m-gauge" aria-hidden="true">
+        <span className="m-gauge-fill" style={{ width: `${Math.max(2, Math.min(100, battery))}%` }} />
+      </span>
+    </div>
+  )
+}
+
+/** The wireless signal as a word over four segments, its dBm beside the name when the mouse gives it; nothing on a wired mouse or one that does not report it. */
 function Signal({ status }: { status: MouseStatus }) {
   const level = signalLevel(status)
   if (level == null) return null
   const bars = Math.max(1, Math.round(level * 4))
+  const dbm = DBM.exec(status.connectionDetail ?? '')?.[1]
   return (
-    <div className={`m-signal${level <= 0.25 ? ' is-weak' : ''}`} aria-label={`Signal ${signalWord(level).toLowerCase()}`}>
-      <span className="m-signal-bars" aria-hidden="true">
-        {[1, 2, 3, 4].map(i => <span key={i} className={i <= bars ? 'is-on' : ''} style={{ height: `${i * 25}%` }} />)}
+    <div className={`m-stat${level <= 0.25 ? ' is-low' : ''}`} aria-label={`Signal ${signalWord(level).toLowerCase()}${dbm ? `, ${dbm} dBm` : ''}`}>
+      <span className="m-stat-label">Signal{dbm ? <span className="m-stat-detail">{dbm} dBm</span> : null}</span>
+      <span className="m-stat-figure">{signalWord(level)}</span>
+      <span className="m-gauge is-steps" aria-hidden="true">
+        {[1, 2, 3, 4].map(i => <span key={i} className={`m-gauge-step${i <= bars ? ' is-on' : ''}`} />)}
       </span>
-      <span>{signalWord(level)} signal</span>
     </div>
   )
 }
@@ -145,22 +295,13 @@ function Sensitivity(section: Section) {
       ) : null}
       {stages.length > 0 ? (
         <Row label="Stages">
-          <span className="m-stages" role="radiogroup" aria-label="DPI stage">
-            {stages.map((dpi, i) => (
-              <button
-                key={i}
-                type="button"
-                role="radio"
-                aria-checked={status.activeDpiStage === i}
-                className={`m-stage${status.activeDpiStage === i ? ' is-on' : ''}`}
-                disabled={busy || !can(client, 'setActiveDpiStage')}
-                onClick={() => void apply('setActiveDpiStage', i)}
-              >
-                {status.dpiStageColors?.[i] ? <span className="m-stage-dot" style={{ background: status.dpiStageColors[i] }} /> : null}
-                {dpi}
-              </button>
-            ))}
-          </span>
+          <Segmented
+            label="DPI stage"
+            options={stages.map((dpi, i) => ({ value: i, label: String(dpi), color: status.dpiStageColors?.[i], disabled: !can(client, 'setActiveDpiStage') }))}
+            value={status.activeDpiStage}
+            onChange={i => void apply('setActiveDpiStage', i)}
+            disabled={busy}
+          />
         </Row>
       ) : null}
     </Panel>
@@ -170,7 +311,7 @@ function Sensitivity(section: Section) {
 // ------------------------------------------------------------------ performance
 
 const POLLING = [125, 250, 500, 1000, 2000, 4000, 8000]
-/** The Starlight X's lift-off presets, the two its receiver reports back as presets. */
+/** The Starlight X's lift-off presets, raw 2 and 3 on the wire (xpanel). */
 const PAW_PRESETS = [{ value: 1, label: '1 mm' }, { value: 2, label: '2 mm' }] as const
 const DEBOUNCE = [0, 1, 2, 4, 8, 12, 16]
 
@@ -190,28 +331,24 @@ function Performance(section: Section) {
   const fixedRate = !!ui.pollingReadOnly || rates.length === 0
   const lods = (status.supportedLiftOffDistances ?? ['Low', 'Medium', 'High']).filter(v => !((ui.hideLodLow || ui.family === 'egg-ot') && v === 'Low'))
   const processing = !ui.hideProcessingCard
+  const paw = status.finalmousePawLodMm
+  // A fixed rate (fixedPollingRate) is a fact the hero shows, not a row here.
   const rows = [
-    !brandPolling && fixedRate && status.pollingRateHz > 0 && (
-      <Row key="poll" label="Polling rate" value={ui.pollingNote ?? (ui.family === 'finalmouse-slx' ? 'PerfectPolling' : undefined)}>
-        <span className="m-state">{status.pollingRateHz} Hz</span>
-      </Row>
-    ),
     !brandPolling && !fixedRate && can(client, 'setPollingRate') && (
-      <Row key="poll" label="Polling rate" value={ui.pollingNote}>
+      <Row key="poll" label="Polling rate">
         <Segmented label="Polling rate" options={rates.map(r => ({ value: r, label: hz(r) }))} value={status.pollingRateHz}
           onChange={v => void apply('setPollingRate', v)} disabled={busy} />
       </Row>
     ),
-    !brandLiftOff && status.liftOffDistance != null && status.finalmousePawLodMm == null && can(client, 'setLiftOffDistance') && (
+    !brandLiftOff && status.liftOffDistance != null && paw == null && can(client, 'setLiftOffDistance') && (
       <Row key="lod" label="Lift-off distance">
         <Segmented label="Lift-off distance" options={lods.map(v => ({ value: v, label: v }))} value={status.liftOffDistance}
           onChange={v => void apply('setLiftOffDistance', v)} disabled={busy} />
       </Row>
     ),
-    status.finalmousePawLodMm != null && can(client, 'setPawLodMm') && (
-      <Row key="paw" label="Lift-off distance" value={status.finalmousePawLodCustom ? `Custom ${status.finalmousePawLodMm.toFixed(1)} mm, set in xpanel` : undefined}>
-        <Segmented label="Lift-off distance" options={PAW_PRESETS} value={status.finalmousePawLodCustom ? null : status.finalmousePawLodMm}
-          onChange={v => void apply('setPawLodMm', v)} disabled={busy} />
+    paw != null && can(client, 'setPawLodMm') && (
+      <Row key="paw" label="Lift-off distance">
+        <PawLiftOff {...section} paw={paw} custom={finalmouseCustomLod(status) && can(client, 'setLiftOffScale')} />
       </Row>
     ),
     processing && !ui.hideMotionSync && status.motionSync != null && can(client, 'setMotionSync') && (
@@ -251,6 +388,30 @@ function Performance(section: Section) {
   return rows.length ? <Panel title="Performance">{rows}</Panel> : null
 }
 
+/**
+ * The Starlight X's lift-off as one control: its two presets in a pill and,
+ * when its firmware has it, xpanel's custom distance (1.0-1.7 mm in 0.1 mm
+ * steps, raw 10-17) on a slider beside them. Whichever the mouse runs is the
+ * lit one; the other rests dim, the slider reading Custom.
+ */
+function PawLiftOff({ status, apply, busy, paw, custom }: Section & { paw: number; custom: boolean }) {
+  const isCustom = !!status.finalmousePawLodCustom
+  const raw = Math.min(17, Math.max(10, Math.round(paw * 10)))
+  return (
+    <span className="m-lod">
+      {custom ? (
+        <span className={isCustom ? undefined : 'm-dim'}>
+          <Slider label="Custom lift-off" min={10} max={17} step={1} value={raw}
+            format={v => (isCustom || v !== raw ? `${(v / 10).toFixed(1)} mm` : 'Custom')}
+            onCommit={v => void apply('setLiftOffScale', v)} disabled={busy} />
+        </span>
+      ) : null}
+      <Segmented label="Lift-off distance" options={PAW_PRESETS} value={isCustom ? null : paw}
+        onChange={v => void apply('setPawLodMm', v)} disabled={busy} />
+    </span>
+  )
+}
+
 /** A preset list that also holds the value the mouse reports, in order. */
 function withCurrent(list: number[], current: number): number[] {
   return list.includes(current) ? list : [...list, current].sort((a, b) => a - b)
@@ -286,8 +447,7 @@ function Lighting(section: Section) {
       </Row>
       {light.mode && light.colorModes.includes(light.mode) ? (
         <Row label="Colour">
-          <input type="color" className="m-color" aria-label="Colour" value={light.color ?? '#ffffff'} disabled={busy}
-            onChange={e => set({ color: e.target.value })} />
+          <ColorField label="Colour" value={light.color ?? '#ffffff'} disabled={busy} onCommit={color => set({ color })} />
         </Row>
       ) : null}
       {light.brightnessLevels?.length ? (
@@ -317,3 +477,4 @@ function Power({ status, client, apply, busy }: Section) {
     </Panel>
   )
 }
+

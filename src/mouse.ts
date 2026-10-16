@@ -23,6 +23,8 @@ export type MouseState = {
   /** The last change that did not take, in a sentence. */
   error: string | null
   busy: boolean
+  /** When the mouse last answered a read (ms since epoch); 0 before the first. */
+  readAt: number
 }
 
 /** A client method by name, when this mouse's driver has it. */
@@ -52,24 +54,28 @@ async function findCandidates(): Promise<Candidate[]> {
 }
 
 const REFRESH_VISIBLE_MS = 4_000
+/**
+ * Behind the room (Exo in the background, a game in front) the mouse is read
+ * only for its battery, for Exo's title bar, as often as OpenMouse Bridge
+ * reads it: every five minutes, and never for a mouse with no battery.
+ */
+const REFRESH_HIDDEN_MS = 5 * 60_000
 const SETTLE_MS = 250
 const RETRY_VISIBLE_MS = 5_000
-const RETRY_HIDDEN_MS = 30_000
 /** Setters after which the mouse is no longer talking to this PC (Logitech Easy-Switch). */
 const LEAVES_THIS_PC = new Set(['requestHostSwitch'])
 const CONFIRM_MS = 800
 
 const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms))
-const REFRESH_HIDDEN_MS = 60_000
 
 /**
  * The connected mouse: found, opened and read, then read again every few
- * seconds while the room is on screen (and once a minute behind it, for the
- * battery). Every change goes through `apply`, which reads the mouse back so
- * what shows is what the mouse took.
+ * seconds while the room is on screen (and only for its battery behind it).
+ * Every change goes through `apply`, which reads the mouse back so what
+ * shows is what the mouse took.
  */
 export function useMouse() {
-  const [state, setState] = useState<MouseState>({ phase: 'looking', candidates: [], current: null, brand: '', status: null, error: null, busy: false })
+  const [state, setState] = useState<MouseState>({ phase: 'looking', candidates: [], current: null, brand: '', status: null, error: null, busy: false, readAt: 0 })
   const client = useRef<SupportedClient | null>(null)
   const writing = useRef(0)
   // Hidden until the room says otherwise: Exo starts this frame behind a closed room, and
@@ -112,8 +118,8 @@ export function useMouse() {
         client.current = null
         await old.close().catch(() => undefined)
       }
-      if (!pick) { setState({ phase: 'none', candidates, current: null, brand: '', status: null, error: null, busy: false }); return }
-      setState({ phase: 'opening', candidates, current: pick, brand: '', status: null, error: null, busy: false })
+      if (!pick) { setState({ phase: 'none', candidates, current: null, brand: '', status: null, error: null, busy: false, readAt: 0 }); return }
+      setState({ phase: 'opening', candidates, current: pick, brand: '', status: null, error: null, busy: false, readAt: 0 })
       const drivers = await registry()
       const next = drivers.createSupportedClient(pick.device)
       if (!next) { setState(s => ({ ...s, phase: 'error', error: 'No driver answers for this mouse.' })); return }
@@ -122,7 +128,7 @@ export function useMouse() {
         const status = await next.readStatus()
         if (!live) { await next.close().catch(() => undefined); return }
         client.current = next
-        setState({ phase: 'ready', candidates, current: pick, brand: drivers.deviceBrand(next), status, error: null, busy: false })
+        setState({ phase: 'ready', candidates, current: pick, brand: drivers.deviceBrand(next), status, error: null, busy: false, readAt: Date.now() })
       } catch (e) {
         await next.close().catch(() => undefined)
         if (live) setState(s => ({ ...s, phase: 'error', error: message(e) }))
@@ -136,30 +142,34 @@ export function useMouse() {
     if (!c || writing.current > 0) return
     try {
       const status = await c.readStatus()
-      if (client.current === c && writing.current === 0) setState(s => ({ ...s, status }))
+      if (client.current === c && writing.current === 0) setState(s => ({ ...s, status, readAt: Date.now() }))
     } catch {
       // A wireless mouse asleep or out of range: the last status stays.
     }
   }, [])
 
   // A mouse Exo could not reach (asleep, out of range, or Exo still starting) is tried
-  // again by itself: soon while the room is on screen, now and then behind it.
+  // again by itself: at once when the room opens, every few seconds while it is on
+  // screen, and at the battery cadence behind it.
   useEffect(() => {
     if (state.phase !== 'error') return
-    const timer = window.setTimeout(() => setScan(n => n + 1), visible ? RETRY_VISIBLE_MS : RETRY_HIDDEN_MS)
+    const timer = window.setTimeout(() => setScan(n => n + 1), visible ? RETRY_VISIBLE_MS : REFRESH_HIDDEN_MS)
     return () => window.clearTimeout(timer)
   }, [state.phase, visible])
+  const phase = useRef(state.phase)
+  phase.current = state.phase
+  useEffect(() => { if (visible && phase.current === 'error') setScan(n => n + 1) }, [visible])
 
+  const hasBattery = state.status?.batteryPercent != null
   useEffect(() => {
-    if (state.phase !== 'ready') return
+    if (state.phase !== 'ready' || (!visible && !hasBattery)) return
     // A status read is a burst of requests to the mouse: never faster than its driver asks for.
     const own = (client.current as unknown as { pollIntervalMs?: number } | null)?.pollIntervalMs ?? 0
     const timer = window.setInterval(() => void refresh(), visible ? Math.max(REFRESH_VISIBLE_MS, own) : REFRESH_HIDDEN_MS)
     if (visible) void refresh()
     return () => window.clearInterval(timer)
-  }, [state.phase, visible, refresh])
+  }, [state.phase, visible, hasBattery, refresh])
 
-  /** Runs one setter, then reads the mouse back. */
   /** Runs setters in order, then reads the mouse back once; resolves to what the mouse took (null when a step failed). */
   const applyAll = useCallback(async (steps: Step[]): Promise<MouseStatus | null> => {
     const c = client.current
@@ -173,7 +183,7 @@ export function useMouse() {
       // the old values; a short settle reads what it took, and a second read confirms it.
       await sleep(SETTLE_MS)
       const status = await c.readStatus()
-      if (client.current === c) setState(s => ({ ...s, status }))
+      if (client.current === c) setState(s => ({ ...s, status, readAt: Date.now() }))
       window.setTimeout(() => void refresh(), CONFIRM_MS)
       return status
     } catch (e) {

@@ -1,27 +1,62 @@
+import { useState } from 'react'
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can } from './mouse'
-import type { useMouse } from './mouse'
-import { Panel, Row, Segmented, Slider } from './ui'
+import type { Section } from './section'
+import { ColorField, Panel, Row, Segmented, Slider } from './ui'
 
-type Section = {
-  status: MouseStatus
-  client: ReturnType<typeof useMouse>['client']
-  apply: (method: string, ...args: unknown[]) => Promise<MouseStatus | null>
-  busy: boolean
-}
+/**
+ * Finalmouse facts from xpanel (xpanel.finalmouse.com, read with REA):
+ * actuation 0.01-0.40 mm (default 0.25), rapid trigger 150-250 µm (default
+ * 220), release point Normal 0 / Early 1 / Late 2 per side, Late only on
+ * firmware 1.1.1 or newer, custom lift-off 1.0-1.7 mm on firmware 1.1.0 or
+ * newer, receiver light Off 0 / Battery 1 / Custom colour 2 / TMR-DS 4. A
+ * side whose actuation reads 0 is not calibrated and cannot go analog.
+ */
+const ACTUATION_DEFAULT = 25
+const RT_DEFAULT = 220
+const LATE_FIRMWARE = '1.1.1'
+const CUSTOM_LOD_FIRMWARE = '1.1.0'
 
 const CLICK = [{ value: 0, label: 'Mechanical' }, { value: 1, label: 'Analog' }] as const
 const RELEASE = [{ value: 0, label: 'Normal' }, { value: 1, label: 'Early' }, { value: 2, label: 'Late' }] as const
 
+/** Every version the mouse reports ("Mouse 1.1.1", "Dongle RF 1.1.1"), by what it is for. */
+function firmware(status: MouseStatus): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const line of status.firmware ?? []) {
+    const m = /^(.*?)\s*(\d+(?:\.\d+)+)/.exec(line)
+    if (m) map.set(m[1].trim().toLowerCase(), m[2])
+  }
+  return map
+}
+
+function older(version: string, than: string): boolean {
+  const a = version.split('.').map(Number)
+  const b = than.split('.').map(Number)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+  }
+  return false
+}
+
+/** True when every version the mouse reports is at least `version`, and it reported the mouse's own. */
+export function finalmouseFirmwareAtLeast(status: MouseStatus, version: string): boolean {
+  const all = firmware(status)
+  return all.has('mouse') && [...all.values()].every(v => !older(v, version))
+}
+
+/** The Starlight X's custom lift-off, 1.0-1.7 mm, when its firmware has it or it is already set. */
+export function finalmouseCustomLod(status: MouseStatus): boolean {
+  return !!status.finalmousePawLodCustom || finalmouseFirmwareAtLeast(status, CUSTOM_LOD_FIRMWARE)
+}
+
 /**
  * The Starlight X's own settings: its TMR analog main switches (mode,
- * actuation, rapid trigger, release), profiles, the receiver's LED and
- * tournament scroll. Each side is set with the other side's current value,
- * since the mouse takes both in one command.
+ * actuation, rapid trigger and release point per side), onboard profiles,
+ * and the receiver's light and Bhop mode.
  */
 export function FinalmousePanels(section: Section) {
-  const { status } = section
-  if (!status.finalmouseIsSlx) return null
+  if (!section.status.finalmouseIsSlx) return null
   return (
     <>
       <Switches {...section} />
@@ -30,62 +65,100 @@ export function FinalmousePanels(section: Section) {
   )
 }
 
+const TOGETHER = [{ value: 'both', label: 'Together' }, { value: 'apart', label: 'Separate' }] as const
+
+type Side = { mode: number; calibrated: boolean; thr: number; rt: number; rel: number | null | undefined }
+type SideSetters = { click: (v: number) => void; thr: (v: number) => void; rt: (v: number) => void; rel: (v: number) => void }
+
+/**
+ * The main switches. Both sides set alike show as one set of rows (Together,
+ * as Exo's magnetic switches do), written to both sides at once; Separate
+ * gives each side its own. A side that is not calibrated stays mechanical, so
+ * the sides can only go together when both are.
+ */
 function Switches({ status, client, apply, busy }: Section) {
+  const [pick, setPick] = useState<'both' | 'apart' | null>(null)
   const modeL = status.finalmouseClickModeL
   const modeR = status.finalmouseClickModeR
   if (modeL == null || modeR == null || !can(client, 'setClickMode')) return null
-  const relL = status.finalmouseClickReleaseL ?? 0
-  const relR = status.finalmouseClickReleaseR ?? 0
-  const thrL = status.finalmouseTmrThrL ?? 20
-  const thrR = status.finalmouseTmrThrR ?? 20
-  const rtL = status.finalmouseTmrHystL ?? 200
-  const rtR = status.finalmouseTmrHystR ?? 200
-  const analog = modeL === 1 || modeR === 1
+  const relL = status.finalmouseClickReleaseL
+  const relR = status.finalmouseClickReleaseR
+  const left: Side = { mode: modeL, calibrated: status.finalmouseTmrThrL !== 0, thr: status.finalmouseTmrThrL || ACTUATION_DEFAULT, rt: status.finalmouseTmrHystL ?? RT_DEFAULT, rel: relL }
+  const right: Side = { mode: modeR, calibrated: status.finalmouseTmrThrR !== 0, thr: status.finalmouseTmrThrR || ACTUATION_DEFAULT, rt: status.finalmouseTmrHystR ?? RT_DEFAULT, rel: relR }
+  const releases = relL != null && relR != null
+  const late = relL === 2 || relR === 2 || finalmouseFirmwareAtLeast(status, LATE_FIRMWARE)
+  const release = late ? RELEASE : RELEASE.filter(o => o.value !== 2)
+  const actuation = can(client, 'setTmrActuation')
   const tmr = (l: number, r: number, hl: number, hr: number) => void apply('setTmrActuation', l / 100, r / 100, hl, hr)
-  const setModes = (l: number, r: number) => apply('setClickMode', l, r, relL, relR)
+  // The mouse takes both sides in one command; release points ride along only when it reported them.
+  const setModes = (l: number, r: number, rl = relL, rr = relR) =>
+    void (releases ? apply('setClickMode', l, r, rl, rr) : apply('setClickMode', l, r))
+  const pairable = left.calibrated && right.calibrated
+  const alike = left.mode === right.mode && left.thr === right.thr && left.rt === right.rt && left.rel === right.rel
+  const together = pairable && (pick ?? (alike ? 'both' : 'apart')) === 'both'
   const mask = status.finalmouseProfileEnabledMask
   const profiles = Array.from({ length: status.finalmouseProfileCount ?? 0 }, (_, i) => i)
     .filter(i => mask == null || (mask & (1 << i)) !== 0 || i === status.finalmouseProfileActive)
+
+  const rows = (name: string, side: Side, set: SideSetters) => {
+    const label = (what: string) => (name ? `${name} ${what.toLowerCase()}` : what)
+    return (
+      <>
+        <Row label={label('Click')}>
+          {side.calibrated
+            ? <Segmented label={label('Click')} options={CLICK} value={side.mode} onChange={set.click} disabled={busy} />
+            : <span className="m-state">Mechanical</span>}
+        </Row>
+        {side.mode === 1 && actuation ? (
+          <>
+            <Row label={label('Actuation')}>
+              <Slider label={label('Actuation')} min={1} max={40} step={1} value={side.thr} format={v => `${(v / 100).toFixed(2)} mm`}
+                onCommit={set.thr} disabled={busy} />
+            </Row>
+            <Row label={label('Rapid trigger')}>
+              <Slider label={label('Rapid trigger')} min={150} max={250} step={10} value={side.rt} format={v => `${v} µm`}
+                onCommit={set.rt} disabled={busy} />
+            </Row>
+            {releases ? (
+              <Row label={label('Release')}>
+                <Segmented label={label('Release')} options={release} value={side.rel} onChange={set.rel} disabled={busy} />
+              </Row>
+            ) : null}
+          </>
+        ) : null}
+      </>
+    )
+  }
+
   return (
     <Panel title="Main switches">
-      <Row label="Left click">
-        <Segmented label="Left click" options={CLICK} value={modeL} onChange={v => void setModes(v, modeR)} disabled={busy} />
-      </Row>
-      <Row label="Right click">
-        <Segmented label="Right click" options={CLICK} value={modeR} onChange={v => void setModes(modeL, v)} disabled={busy} />
-      </Row>
-      {analog && can(client, 'setTmrActuation') ? (
-        <>
-          {modeL === 1 ? (
-            <Row label="Left actuation">
-              <Slider label="Left actuation" min={1} max={40} step={1} value={thrL} format={v => `${(v / 100).toFixed(2)} mm`}
-                onCommit={v => tmr(v, thrR, rtL, rtR)} disabled={busy} />
-            </Row>
-          ) : null}
-          {modeR === 1 ? (
-            <Row label="Right actuation">
-              <Slider label="Right actuation" min={1} max={40} step={1} value={thrR} format={v => `${(v / 100).toFixed(2)} mm`}
-                onCommit={v => tmr(thrL, v, rtL, rtR)} disabled={busy} />
-            </Row>
-          ) : null}
-          {modeL === 1 ? (
-            <Row label="Left rapid trigger">
-              <Slider label="Left rapid trigger" min={150} max={250} step={10} value={rtL} format={v => `${v} µm`}
-                onCommit={v => tmr(thrL, thrR, v, rtR)} disabled={busy} />
-            </Row>
-          ) : null}
-          {modeR === 1 ? (
-            <Row label="Right rapid trigger">
-              <Slider label="Right rapid trigger" min={150} max={250} step={10} value={rtR} format={v => `${v} µm`}
-                onCommit={v => tmr(thrL, thrR, rtL, v)} disabled={busy} />
-            </Row>
-          ) : null}
-          <Row label="Release point">
-            <Segmented label="Release point" options={RELEASE} value={relL === relR ? relL : null}
-              onChange={v => void apply('setClickMode', modeL, modeR, v, v)} disabled={busy} />
-          </Row>
-        </>
+      {pairable ? (
+        <Row label="Sides">
+          <Segmented label="Sides" options={TOGETHER} value={together ? 'both' : 'apart'} onChange={setPick} />
+        </Row>
       ) : null}
+      {together ? rows('', left, {
+        // Together writes the shown (left) values to both sides.
+        click: v => setModes(v, v, relL, relL),
+        thr: v => tmr(v, v, left.rt, left.rt),
+        rt: v => tmr(left.thr, left.thr, v, v),
+        rel: v => setModes(left.mode, left.mode, v, v),
+      }) : (
+        <>
+          {rows('Left', left, {
+            click: v => setModes(v, modeR),
+            thr: v => tmr(v, right.thr, left.rt, right.rt),
+            rt: v => tmr(left.thr, right.thr, v, right.rt),
+            rel: v => setModes(modeL, modeR, v, relR),
+          })}
+          {rows('Right', right, {
+            click: v => setModes(modeL, v),
+            thr: v => tmr(left.thr, v, left.rt, right.rt),
+            rt: v => tmr(left.thr, right.thr, left.rt, v),
+            rel: v => setModes(modeL, modeR, relL, v),
+          })}
+        </>
+      )}
       {profiles.length > 1 && can(client, 'setActiveProfile') ? (
         <Row label="Onboard profile">
           <Segmented
@@ -101,25 +174,38 @@ function Switches({ status, client, apply, busy }: Section) {
   )
 }
 
-const DONGLE_LED = [{ value: 0, label: 'Off' }, { value: 1, label: 'Battery' }, { value: 2, label: 'White' }] as const
-const SCROLL = [{ value: 0, label: 'Off' }, { value: 1, label: 'Up' }, { value: 2, label: 'Down' }, { value: 3, label: 'Both' }] as const
+const LIGHT = [{ value: 0, label: 'Off' }, { value: 1, label: 'Battery' }, { value: 2, label: 'Custom' }, { value: 4, label: 'TMR-DS' }] as const
+const BHOP = [{ value: 0, label: 'Off' }, { value: 1, label: 'Up' }, { value: 2, label: 'Down' }, { value: 3, label: 'Both' }] as const
 const PASS = [{ value: 100, label: '100 ms' }, { value: 500, label: '500 ms' }, { value: 1000, label: '1 s' }, { value: 1500, label: '1.5 s' }] as const
 
+type Rgb = { r: number; g: number; b: number }
+/** The receiver's custom colour (command 54), which the patched driver reads; see scripts/patch-protocol.mjs. */
+export const indicatorColor = (status: MouseStatus) => (status as unknown as { finalmouseIndicatorColor?: Rgb | null }).finalmouseIndicatorColor ?? null
+const hex = ({ r, g, b }: Rgb) => `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
+const rgb = (value: string): [number, number, number] => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16)) as [number, number, number]
+
 function Receiver({ status, client, apply, busy }: Section) {
+  const color = indicatorColor(status)
   const rows = [
     status.finalmouseDongleLedMode != null && can(client, 'setDongleLedMode') && (
+      // The custom colour sits in the light's own row, beside the pill, while Custom is on.
       <Row key="led" label="Receiver light">
-        <Segmented label="Receiver light" options={DONGLE_LED} value={status.finalmouseDongleLedMode} onChange={v => void apply('setDongleLedMode', v)} disabled={busy} />
+        <span className="m-inline">
+          {status.finalmouseDongleLedMode === 2 && color && can(client, 'setIndicatorColor') ? (
+            <ColorField label="Light colour" value={hex(color)} disabled={busy} onCommit={v => void apply('setIndicatorColor', ...rgb(v))} />
+          ) : null}
+          <Segmented label="Receiver light" options={LIGHT} value={status.finalmouseDongleLedMode} onChange={v => void apply('setDongleLedMode', v)} disabled={busy} />
+        </span>
       </Row>
     ),
     status.finalmouseTournamentScrollMode != null && can(client, 'setTournamentScrollMode') && (
-      <Row key="scroll" label="Tournament scroll">
-        <Segmented label="Tournament scroll" options={SCROLL} value={status.finalmouseTournamentScrollMode} onChange={v => void apply('setTournamentScrollMode', v)} disabled={busy} />
+      <Row key="scroll" label="Bhop mode">
+        <Segmented label="Bhop mode" options={BHOP} value={status.finalmouseTournamentScrollMode} onChange={v => void apply('setTournamentScrollMode', v)} disabled={busy} />
       </Row>
     ),
-    status.finalmouseTournamentScrollMode && status.finalmouseTournamentScrollTimeoutMs != null && can(client, 'setTournamentScrollTimeout') && (
-      <Row key="pass" label="Passthrough window">
-        <Segmented label="Passthrough window" options={PASS} value={status.finalmouseTournamentScrollTimeoutMs} onChange={v => void apply('setTournamentScrollTimeout', v)} disabled={busy} />
+    !!status.finalmouseTournamentScrollMode && status.finalmouseTournamentScrollTimeoutMs != null && can(client, 'setTournamentScrollTimeout') && (
+      <Row key="pass" label="Pass-through window">
+        <Segmented label="Pass-through window" options={PASS} value={status.finalmouseTournamentScrollTimeoutMs} onChange={v => void apply('setTournamentScrollTimeout', v)} disabled={busy} />
       </Row>
     ),
   ].filter(Boolean)

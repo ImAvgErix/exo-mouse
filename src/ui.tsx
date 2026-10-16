@@ -1,11 +1,17 @@
-import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useGlide } from './glide'
 
-/** A section: rounded, hairline, black inside; its name is the only bold type. */
-export function Panel({ title, children, wide = false }: { title: string; children: ReactNode; wide?: boolean }) {
+/** A section: its name is the only bold type, its rows ruled by hairlines; it rises in when it appears. */
+export function Panel({ title, actions, children }: { title: string; children?: ReactNode; /** Buttons on the title's own line, for a panel that is only a few actions. */ actions?: ReactNode }) {
   const id = useId()
   return (
-    <section className={`m-panel${wide ? ' is-wide' : ''}`} aria-labelledby={id}>
-      <h2 id={id} className="m-panel-title">{title}</h2>
+    <section className={`m-panel m-arrive${actions ? ' has-actions' : ''}`} aria-labelledby={id}>
+      {actions ? (
+        <div className="m-panel-head">
+          <h2 id={id} className="m-panel-title">{title}</h2>
+          <span className="m-actions">{actions}</span>
+        </div>
+      ) : <h2 id={id} className="m-panel-title">{title}</h2>}
       {children}
     </section>
   )
@@ -21,16 +27,18 @@ export function Row({ label, value, children }: { label: string; value?: string;
   )
 }
 
-/** One pill; the current option filled. */
+/** One pill; the current option filled, the fill gliding to a new choice. */
 export function Segmented<T extends string | number>({ label, options, value, onChange, disabled = false }: {
   label: string
-  options: readonly { value: T; label: string }[]
+  /** color: a dot before the label (a DPI stage's LED colour). */
+  options: readonly { value: T; label: string; disabled?: boolean; color?: string }[]
   value: T | null | undefined
   onChange: (value: T) => void
   disabled?: boolean
 }) {
+  const glide = useGlide<HTMLSpanElement>()
   return (
-    <span className="m-seg" role="radiogroup" aria-label={label}>
+    <span ref={glide} className="m-seg m-glide" role="radiogroup" aria-label={label}>
       {options.map(o => (
         <button
           key={String(o.value)}
@@ -38,9 +46,10 @@ export function Segmented<T extends string | number>({ label, options, value, on
           role="radio"
           aria-checked={o.value === value}
           className={`m-seg-item${o.value === value ? ' is-on' : ''}`}
-          disabled={disabled}
+          disabled={disabled || o.disabled}
           onClick={() => o.value !== value && onChange(o.value)}
         >
+          {o.color ? <span className="m-seg-dot" style={{ background: o.color }} /> : null}
           {o.label}
         </button>
       ))}
@@ -48,12 +57,37 @@ export function Segmented<T extends string | number>({ label, options, value, on
   )
 }
 
+/** Exo's switch: a dark track, cream when on. */
 export function Switch({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} className={`m-switch${checked ? ' is-on' : ''}`} disabled={disabled} onClick={() => onChange(!checked)}>
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} className="m-switch" disabled={disabled} onClick={() => onChange(!checked)}>
       <span className="m-switch-knob" />
     </button>
   )
+}
+
+/**
+ * A colour well that writes once, when the picker closes, so dragging through
+ * colours does not send the mouse a command for each one.
+ */
+export function ColorField({ label, value, onCommit, disabled = false }: { label: string; value: string; onCommit: (hex: string) => void; disabled?: boolean }) {
+  const [draft, setDraft] = useState(value)
+  const ref = useRef<HTMLInputElement>(null)
+  const committed = useRef(value)
+  const commit = useRef(onCommit)
+  commit.current = onCommit
+  useEffect(() => { setDraft(value); committed.current = value }, [value])
+  useEffect(() => {
+    const input = ref.current
+    if (!input) return
+    const done = () => {
+      const next = input.value.toLowerCase()
+      if (next !== committed.current.toLowerCase()) commit.current(next)
+    }
+    input.addEventListener('change', done)
+    return () => input.removeEventListener('change', done)
+  }, [])
+  return <input ref={ref} type="color" className="m-color" aria-label={label} value={draft} disabled={disabled} onChange={e => setDraft(e.target.value)} />
 }
 
 /**

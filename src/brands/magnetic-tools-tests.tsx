@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Row } from '../ui'
+import { Row, Segmented } from '../ui'
 import './magnetic-tools.css'
 
 // Adapted from OpenMouse (AGPL-3.0): src/hits-test.ts, src/ui/polling-stats.ts,
@@ -32,32 +32,6 @@ export function Overlay({ title, onClose, children }: { title: string; onClose: 
   )
 }
 
-/** Exo's pill, with options that can be off on their own. */
-export function Choice<T extends string | number>({ label, options, value, onChange, disabled = false }: {
-  label: string
-  options: readonly { value: T; label: string; disabled?: boolean }[]
-  value: T | null | undefined
-  onChange: (value: T) => void
-  disabled?: boolean
-}) {
-  return (
-    <span className="m-seg" role="radiogroup" aria-label={label}>
-      {options.map(o => (
-        <button
-          key={String(o.value)}
-          type="button"
-          role="radio"
-          aria-checked={o.value === value}
-          className={`m-seg-item${o.value === value ? ' is-on' : ''}`}
-          disabled={disabled || o.disabled}
-          onClick={() => o.value !== value && onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </span>
-  )
-}
 
 /** Left and right press depth as ten segments each; `scale` is the depth of a full press. */
 export function DepthMeter({ depth, scale, marks }: { depth: [number, number]; scale: number; marks?: [number, number] }) {
@@ -318,12 +292,12 @@ export function HitsSpeedTest({ subscribe, actuation, maxActuation, onAdjust, bu
 
   const value = actuation[side]
   const at = (step: number) => round?.steps[step - 1] ?? null
-  const label = phase === 'idle' ? (note || 'Click to start') : phase === 'wait' ? 'Wait for green' : phase === 'go' ? 'Click' : phase === 'settle' ? '' : null
+  const label = phase === 'idle' ? (note || 'Click to start') : phase === 'wait' ? 'Wait for green' : phase === 'go' || phase === 'settle' ? 'Click' : null
 
   return (
     <>
       <Row label="Button">
-        <Choice label="Button" options={[{ value: 0, label: 'Left' }, { value: 1, label: 'Right' }]} value={side}
+        <Segmented label="Button" options={[{ value: 0, label: 'Left' }, { value: 1, label: 'Right' }]} value={side}
           onChange={v => { setSide(v as 0 | 1); setRound(null); setPhase('idle'); window.clearTimeout(timer.current) }} />
       </Row>
       <Row label="Actuation" value={`Step ${value} of ${maxActuation}`}>
@@ -336,7 +310,7 @@ export function HitsSpeedTest({ subscribe, actuation, maxActuation, onAdjust, bu
         <DepthMeter depth={depth} scale={10} marks={[actuation[0] - 1, actuation[1] - 1]} />
       </Row>
       <div
-        className={`mt-pad${phase === 'wait' ? ' is-wait' : phase === 'go' ? ' is-go is-big' : phase === 'done' ? ' is-big' : ''}`}
+        className={`mt-pad${phase === 'wait' ? ' is-wait' : phase === 'go' || phase === 'settle' ? ' is-go is-big' : phase === 'done' ? ' is-big' : ''}`}
         onMouseDown={press}
         onMouseUp={e => e.preventDefault()}
         onContextMenu={e => e.preventDefault()}

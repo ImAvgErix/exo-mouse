@@ -18,6 +18,8 @@ const charging = (s: MouseStatus) => s.batteryState.startsWith('Charging')
  * banded the way Finalmouse's own scale does: under 40, 50, 65 dB of loss.
  */
 export function signalLevel(s: MouseStatus): number | null {
+  // A driver that says its signal figure means nothing on this mouse.
+  if (s.ui?.hideSignalCard) return null
   const v = s.signalStrength
   if (v != null && v >= 0) return v <= 4 ? v / 4 : Math.min(1, v / 100)
   const dbm = /(-\d+)\s*dBm/.exec(s.connectionDetail ?? '')

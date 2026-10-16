@@ -551,7 +551,7 @@ function KsnakeMacros({ apply, busy }: Section) {
 
   return (
     <Panel title="Macros">
-      <Row label="Slot" value="Saving rewrites all 32 slots">
+      <Row label="Slot">
         <NumSelect label="Macro slot" options={slotOptions} value={slot} onChange={setSlot} disabled={locked} />
       </Row>
       <Row label="Timing">

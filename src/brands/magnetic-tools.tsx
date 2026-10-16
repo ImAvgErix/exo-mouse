@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MagneticButtonStatus, MagneticButtonsStatus, MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, type Step } from '../mouse'
 import type { Section } from '../section'
-import { Panel, Row, Slider, Switch } from '../ui'
-import { Choice, ClickTest, DepthMeter, HitsSpeedTest, Overlay, PollingTest } from './magnetic-tools-tests'
+import { Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { ClickTest, DepthMeter, HitsSpeedTest, Overlay, PollingTest } from './magnetic-tools-tests'
 import './magnetic-tools.css'
 
 // Adapted from OpenMouse (AGPL-3.0): src/app/MagneticButtons.tsx,
@@ -56,7 +56,7 @@ function MagneticPanel(section: Section) {
     <Panel title="Magnetic switches">
       {magnetic.liveDepth && can(client, 'onButtonDepth') ? <LiveDepth section={section} magnetic={magnetic} /> : null}
       <Row label="Buttons">
-        <Choice label="Buttons" options={TOGETHER} value={shown} onChange={setMode} />
+        <Segmented label="Buttons" options={TOGETHER} value={shown} onChange={setMode} />
       </Row>
       {shown === 'both'
         ? <MagneticControls section={section} magnetic={magnetic} targets={[0, 1]} prefix="" />
@@ -116,7 +116,7 @@ function MagneticControls({ section, magnetic, targets, prefix }: {
     const types = magnetic.buttons.map(b => b.switchType) as ['magnetic' | 'optical', 'magnetic' | 'optical']
     rows.push(
       <Row key="type" label={name('Switch')}>
-        <Choice
+        <Segmented
           label={name('Switch')}
           options={[
             { value: 'magnetic', label: 'Magnetic', disabled: magnetic.calibration === 'needed' },
@@ -385,7 +385,7 @@ function HitsPanel(section: Section) {
         </Row>
       ) : null}
       <Row label="Buttons">
-        <Choice label="Buttons" options={TOGETHER} value={shown} onChange={setMode} />
+        <Segmented label="Buttons" options={TOGETHER} value={shown} onChange={setMode} />
       </Row>
       {shown === 'both'
         ? <HitsControls tuning={tuning} state={now.left} prefix="" busy={busy} onChange={v => write([v, v])} />
@@ -460,12 +460,14 @@ function TestsPanel(section: Section) {
   const hits = !!tuning && tuning.buttons.length === 2 && can(client, 'setAnalogButtonTuning')
     && can(client, 'onAnalogPress') && can(client, 'startAnalogPressStream') && can(client, 'stopAnalogPressStream')
   const close = useCallback(() => setOpen(null), [])
-  const run = (test: Test) => <button type="button" className="m-button" onClick={() => setOpen(test)}>Run</button>
+  const run = (test: Test, name: string) => <button type="button" className="m-button" onClick={() => setOpen(test)}>{name}</button>
+  // Each test is one button on the panel's own line; it opens over the room.
   return (
-    <Panel title="Tests">
-      <Row label="Polling rate">{run('polling')}</Row>
-      <Row label="Clicks and bounce">{run('clicks')}</Row>
-      {hits ? <Row label="HITS speed">{run('hits')}</Row> : null}
+    <Panel title="Tests" actions={<>
+      {run('polling', 'Polling rate')}
+      {run('clicks', 'Clicks and bounce')}
+      {hits ? run('hits', 'HITS speed') : null}
+    </>}>
       {open === 'polling' ? <Overlay title="Polling rate" onClose={close}><PollingTest reportedHz={status.pollingRateHz || null} /></Overlay> : null}
       {open === 'clicks' ? <Overlay title="Clicks and bounce" onClose={close}><ClickTest /></Overlay> : null}
       {open === 'hits' && hits ? <HitsTest section={section} onClose={close} /> : null}

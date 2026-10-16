@@ -27,6 +27,8 @@ own; it reaches devices only through a small message protocol with its host:
 | one-way `{ notice }` / `{ state }` | A one-line notice for Exo to show, and the mouse's name and battery for its title bar |
 | event `game.runState { id, isRunning }` | A game started or stopped |
 | event `room.visible` | Whether the Devices room is on screen |
+| `exo.textScale`, event `exo.textScale { scale }` | The host's text size, as a factor on every font size |
+| `exo.motion`, event `exo.motion { motion }` | `reduce` or `full`: the host's reduce-motion setting, which stops every move here too |
 
 `src/exo-hid.ts` turns that into the browser's WebHID interface, so the
 protocol library's drivers run unchanged.
@@ -36,7 +38,9 @@ protocol library's drivers run unchanged.
 `scripts/patch-protocol.mjs` runs before every build and fixes `@openmouse/protocol`
 0.42.2 where Exo Mouse needs it before upstream ships the fix. Today that is
 reading the Finalmouse Starlight X's DPI and polling rate
-([OpenMouse-Project/mouse-protocol#230](https://github.com/OpenMouse-Project/mouse-protocol/pull/230)).
+([OpenMouse-Project/mouse-protocol#230](https://github.com/OpenMouse-Project/mouse-protocol/pull/230)),
+and its receiver light as Finalmouse's xpanel has it: the TMR-DS mode (4) and
+the custom colour (command 54), which the driver neither offered nor read.
 The script stops the build when the library version changes, so a fixed release
 is noticed and the patch removed.
 

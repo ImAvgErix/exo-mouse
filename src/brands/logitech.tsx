@@ -48,32 +48,6 @@ const isLogitech = (status: MouseStatus) => status.ui?.family === 'logitech-hidp
 
 // ------------------------------------------------------------------ local controls
 
-/** A pill group whose options carry their own disabled state. */
-function Pills<T extends string | number>({ label, options, value, onChange, disabled = false }: {
-  label: string
-  options: readonly { value: T; label: string; disabled?: boolean }[]
-  value: T | null | undefined
-  onChange: (value: T) => void
-  disabled?: boolean
-}) {
-  return (
-    <span className="m-seg" role="radiogroup" aria-label={label}>
-      {options.map(o => (
-        <button
-          key={String(o.value)}
-          type="button"
-          role="radio"
-          aria-checked={o.value === value}
-          className={`m-seg-item${o.value === value ? ' is-on' : ''}`}
-          disabled={disabled || o.disabled}
-          onClick={() => o.value !== value && onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </span>
-  )
-}
 
 /** A long list with values that are not strings. */
 function Choose<T extends string | number>({ label, options, value, onChange, disabled = false, describe }: {
@@ -249,10 +223,10 @@ function Sensor({ status, client, apply, busy }: Section) {
           onChange={v => void apply('setGamingSurfaceMode', v)} disabled={busy} />
       </Row>
     ),
-    logitechOwnsLiftOff(status) && status.liftOffDistance != null && lods.length > 0 && can(client, 'setLiftOffDistance') && (
-      <Row key="lod" label="Lift-off distance" value={surfaceOff ? 'Needs the gaming surface on or auto' : undefined}>
+    logitechOwnsLiftOff(status) && !surfaceOff && status.liftOffDistance != null && lods.length > 0 && can(client, 'setLiftOffDistance') && (
+      <Row key="lod" label="Lift-off distance">
         <Segmented label="Lift-off distance" options={lods.map(v => ({ value: v, label: v }))} value={status.liftOffDistance}
-          onChange={v => void apply('setLiftOffDistance', v)} disabled={busy || surfaceOff} />
+          onChange={v => void apply('setLiftOffDistance', v)} disabled={busy} />
       </Row>
     ),
     status.lightforceSwitchMode != null && can(client, 'setLightforceSwitchMode') && (
@@ -352,7 +326,7 @@ function OnboardMemory({ status, client, apply, applyAll, busy }: Section) {
 
   const memoryRows = [
     hasMode && (
-      <Row key="mode" label="Running from" value={format && !format.verified ? 'Profile layout not confirmed on this mouse' : undefined}>
+      <Row key="mode" label="Running from">
         <Segmented label="Running from" options={[{ value: 'Onboard', label: 'Onboard memory' }, { value: 'Host', label: 'This PC' }] as const}
           value={mode} onChange={v => void apply('setOnboardMode', v)} disabled={busy} />
       </Row>
@@ -466,26 +440,16 @@ function Controls({ status, client, apply, busy }: Section) {
 
 // ------------------------------------------------------------------ connection
 
-const SIGNAL_WORDS = ['Very weak', 'Weak', 'Fair', 'Good', 'Excellent']
-
+/** Easy-Switch and the device's name; the signal is the hero's. */
 function Connection(section: Section) {
   const { status } = section
-  const easy = <EasySwitch {...section} />
-  const name = <FriendlyName {...section} />
   const hasEasy = status.hostCount != null && status.currentHost != null && can(section.client, 'requestHostSwitch')
   const hasName = status.friendlyName != null && status.friendlyNameMaxLength != null && can(section.client, 'setFriendlyName')
-  const strength = status.signalStrength
-  const hasSignal = strength != null && !status.ui?.hideSignalCard
-  if (!hasEasy && !hasName && !hasSignal) return null
+  if (!hasEasy && !hasName) return null
   return (
     <Panel title="Connection">
-      {hasEasy ? easy : null}
-      {hasName ? name : null}
-      {hasSignal ? (
-        <Row label="Signal strength">
-          <span className="m-state">{SIGNAL_WORDS[strength] ?? `Level ${strength}`}</span>
-        </Row>
-      ) : null}
+      {hasEasy ? <EasySwitch {...section} /> : null}
+      {hasName ? <FriendlyName {...section} /> : null}
     </Panel>
   )
 }
@@ -497,7 +461,7 @@ function EasySwitch({ status, apply, busy }: Section) {
   const paired = status.hostSlotsPaired
   if (pending !== null) {
     return (
-      <Row label={`Switch to computer ${pending + 1}?`} value="The mouse leaves this PC">
+      <Row label={`Switch to computer ${pending + 1}?`}>
         <span className="lg-pair">
           <button type="button" className="m-link" onClick={() => setPending(null)}>Cancel</button>
           <button type="button" className="m-button" disabled={busy}
@@ -508,7 +472,7 @@ function EasySwitch({ status, apply, busy }: Section) {
   }
   return (
     <Row label="Easy-Switch" value={`Computer ${current + 1} of ${count}`}>
-      <Pills
+      <Segmented
         label="Easy-Switch"
         options={Array.from({ length: count }, (_, slot) => ({
           value: slot,
@@ -561,9 +525,11 @@ function LowPower({ status, client, apply, busy }: Section) {
   const tooFast = status.pollingRateHz > ceiling
   return (
     <Panel title="Low power mode">
-      <Row label="Turn on below" value={tooFast ? `Not available above ${ceiling.toLocaleString()} Hz` : undefined}>
-        <Choose label="Turn on below" options={values.map(v => ({ value: v, label: `${v}%` }))} value={current}
-          onChange={v => void apply('setLowPowerThreshold', v)} disabled={busy || tooFast} />
+      <Row label="Turn on below">
+        {tooFast ? <span className="m-state">Off above {ceiling.toLocaleString()} Hz</span> : (
+          <Choose label="Turn on below" options={values.map(v => ({ value: v, label: `${v}%` }))} value={current}
+            onChange={v => void apply('setLowPowerThreshold', v)} disabled={busy} />
+        )}
       </Row>
     </Panel>
   )

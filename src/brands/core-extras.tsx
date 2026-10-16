@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { MouseLighting, MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import {
   RAZER_BUTTON_CONTROLS,
@@ -10,7 +10,7 @@ import {
 } from '@openmouse/protocol/razer'
 import { can } from '../mouse'
 import type { Section } from '../section'
-import { NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { ColorField, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import './core-extras.css'
 
 /**
@@ -44,26 +44,6 @@ export function coreExtrasReplaces(section: Section) {
 
 // ------------------------------------------------------------------ shared bits
 
-/** A colour well that writes once the picker closes, not per pixel dragged. */
-function ColorWell({ label, value, onCommit, disabled = false }: { label: string; value: string; onCommit: (hex: string) => void; disabled?: boolean }) {
-  const [draft, setDraft] = useState(value)
-  const ref = useRef<HTMLInputElement>(null)
-  const committed = useRef(value)
-  const commit = useRef(onCommit)
-  commit.current = onCommit
-  useEffect(() => { setDraft(value); committed.current = value }, [value])
-  useEffect(() => {
-    const input = ref.current
-    if (!input) return
-    const done = () => {
-      const next = input.value.toLowerCase()
-      if (next !== committed.current.toLowerCase()) commit.current(next)
-    }
-    input.addEventListener('change', done)
-    return () => input.removeEventListener('change', done)
-  }, [])
-  return <input ref={ref} type="color" className="cx-color" aria-label={label} value={draft} disabled={disabled} onChange={e => setDraft(e.target.value)} />
-}
 
 /** A slider over a fixed list of values the mouse accepts, by position. */
 function ListSlider({ label, values, value, format, onCommit, disabled = false }: {
@@ -163,16 +143,8 @@ function Sensitivity(section: Section) {
       {stages.length > 1 ? (
         <Row label="Active stage">
           {canActive ? (
-            <span className="m-stages" role="radiogroup" aria-label="Active stage">
-              {stages.map((dpi, i) => (
-                <button key={i} type="button" role="radio" aria-checked={status.activeDpiStage === i}
-                  className={`m-stage${status.activeDpiStage === i ? ' is-on' : ''}`} disabled={busy}
-                  onClick={() => status.activeDpiStage !== i && void apply('setActiveDpiStage', i)}>
-                  {showColors ? <span className="m-stage-dot" style={{ background: colors![i] }} /> : null}
-                  {dpi}
-                </button>
-              ))}
-            </span>
+            <Segmented label="Active stage" options={stages.map((dpi, i) => ({ value: i, label: String(dpi), color: showColors ? colors![i] : undefined }))}
+              value={status.activeDpiStage} onChange={i => void apply('setActiveDpiStage', i)} disabled={busy} />
           ) : (
             <span className="m-state">{status.activeDpiStage != null ? `Stage ${status.activeDpiStage + 1}` : 'Unknown'}</span>
           )}
@@ -184,9 +156,9 @@ function Sensitivity(section: Section) {
           <Row key={i} label={`Stage ${i + 1}`} value={y != null && y !== dpi ? `Vertical ${y}` : status.activeDpiStage === i && stages.length > 1 ? 'Active' : undefined}>
             <span className="cx-stage">
               {canColor ? (
-                <ColorWell label={`Stage ${i + 1} colour`} value={colors![i]!} disabled={busy}
+                <ColorField label={`Stage ${i + 1} colour`} value={colors![i]!} disabled={busy}
                   onCommit={hex => void apply('setDpiStageColor', i, hex)} />
-              ) : showColors ? <span className="m-stage-dot" style={{ background: colors![i] }} /> : null}
+              ) : showColors ? <span className="m-seg-dot" style={{ background: colors![i] }} /> : null}
               {canValue ? (
                 <>
                   <Slider label={`Stage ${i + 1} DPI`} min={editor.minDpi} max={sliderMax} step={editor.stepDpi}
@@ -456,8 +428,8 @@ function Lighting({ status, client, apply, busy }: Section) {
       {usesColor ? (
         <Row label={usesColor2 ? 'Colours' : 'Colour'}>
           <span className="cx-pair">
-            <ColorWell label="Colour" value={light.color ?? '#ffffff'} onCommit={hex => set({ color: hex })} disabled={busy} />
-            {usesColor2 ? <ColorWell label="Second colour" value={light.color2 ?? '#ff0000'} onCommit={hex => set({ color2: hex })} disabled={busy} /> : null}
+            <ColorField label="Colour" value={light.color ?? '#ffffff'} onCommit={hex => set({ color: hex })} disabled={busy} />
+            {usesColor2 ? <ColorField label="Second colour" value={light.color2 ?? '#ff0000'} onCommit={hex => set({ color2: hex })} disabled={busy} /> : null}
           </span>
         </Row>
       ) : null}
