@@ -8,20 +8,6 @@
   gap: 8px;
 }
 
-.am-select {
-  height: 32px;
-  max-width: 180px;
-  padding: 0 12px;
-  border: 1px solid var(--hair-control);
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--ink);
-  font: inherit;
-  font-size: calc(12px * var(--exo-scale, 1));
-}
-
-.am-select:disabled { opacity: 0.5; }
-
 .am-step .m-number input { width: 56px; }
 
 .am-recording .m-row-value { color: var(--bad); }

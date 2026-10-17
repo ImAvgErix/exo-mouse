@@ -119,15 +119,13 @@ export const changes = (target: Step[], now: Step[]) => target.filter(step => !n
 /**
  * Game state that outlives Profiles: it unmounts whenever the mouse reconnects
  * (a wireless mouse waking, a replug), while this frame and Exo's game events
- * carry on. running: every game Exo says is running, newest last. before: the
- * settings the mouse had before the first linked game (put back when they all
- * close and there is no default profile). switchFor: the mounted Profiles'
- * reaction to a start or stop, none while it is unmounted. landing: the newest
- * switch; a newer one, or Profiles unmounting, stops an older one waiting.
+ * carry on. running: every game Exo says is running, newest last. switchFor: the
+ * mounted Profiles' reaction to a start or stop, none while it is unmounted.
+ * landing: the newest switch; a newer one, or Profiles unmounting, stops an
+ * older one waiting.
  */
 const games = {
   running: [] as string[],
-  before: null as Step[] | null,
   switchFor: null as ((id: string, isRunning: boolean) => void) | null,
   landing: 0,
 }
@@ -150,8 +148,7 @@ const runningProfile = (profiles: Profile[]) =>
  * you like, saved on this PC. Save current stores what the mouse has now;
  * Apply puts it back; the one that matches the mouse right now says Active.
  * A profile can be linked to games: when one starts (Exo says so, room open
- * or not), the settings the mouse had are remembered and the profile is
- * written; when it closes, the remembered settings go back.
+ * or not), the profile is written; when it closes, Desktop goes back.
  */
 export function Profiles({ device, status, client, applyAll, busy }: {
   device: string
@@ -221,7 +218,10 @@ export function Profiles({ device, status, client, applyAll, busy }: {
         await sleep(LAND_CHECK_MS)
         if (games.landing !== ticket) return
         if (took && same(steps, live.current.now)) break
-        if (attempt === LAND_TRIES - 1) return
+        if (attempt === LAND_TRIES - 1) {
+          tell({ notice: 'Your mouse did not take its profile. Apply it again in Devices.' })
+          return
+        }
       }
       if (notice) tell({ notice })
     })()
@@ -231,30 +231,18 @@ export function Profiles({ device, status, client, applyAll, busy }: {
   // connect below lands whatever they leave.
   useEffect(() => {
     games.switchFor = (id, isRunning) => {
-      const { list: profiles, now: current } = live.current
-      const linked = (g: string) => profiles.some(p => p.games?.includes(g))
+      const profiles = live.current.list
       if (isRunning) {
         const profile = profiles.find(p => p.games?.includes(id))
         if (!profile) return
-        if (!games.running.some(g => g !== id && linked(g))) games.before = current
         // The room may be closed and the last read a minute old: write the whole profile.
         land(profile.steps, `${profile.name} mouse profile on for ${titlesNow.current.get(id) ?? 'your game'}.`)
         return
       }
-      if (!linked(id)) return
-      // Another linked game still running keeps its profile; otherwise the default, else what was there before.
-      const still = runningProfile(profiles)
-      const fallback = profiles.find(p => p.isDefault)
-      if (still) {
-        land(still.steps, `${still.name} mouse profile on.`)
-      } else if (fallback) {
-        games.before = null
-        land(fallback.steps, `${fallback.name} mouse profile on.`)
-      } else if (games.before) {
-        const back = games.before
-        games.before = null
-        land(back, 'Your mouse settings are back.')
-      }
+      if (!profiles.some(p => p.games?.includes(id))) return
+      // Another linked game still running keeps its profile; otherwise Desktop (always there once loaded).
+      const next = runningProfile(profiles) ?? profiles.find(p => p.isDefault)
+      if (next) land(next.steps, `${next.name} mouse profile on.`)
     }
     return () => {
       games.switchFor = null
@@ -273,7 +261,6 @@ export function Profiles({ device, status, client, applyAll, busy }: {
     const fixed = withDesktop(list, now)
     if (JSON.stringify(fixed) !== JSON.stringify(list)) save(fixed)
     const target = runningProfile(fixed) ?? fixed[0]
-    if (target.isDefault) games.before = null
     if (!same(target.steps, now)) land(target.steps, null)
   }, [loaded, list, now, applyAll])
 
@@ -287,6 +274,8 @@ export function Profiles({ device, status, client, applyAll, busy }: {
   }
 
   const save = (next: Profile[]) => {
+    // Profiles Exo could not read would be overwritten with this mouse's list alone.
+    if (!loaded) return
     const updated = { ...all, [device]: next }
     setAll(updated)
     writeAll(updated).catch(() => tell({ notice: 'Exo could not save your mouse profiles. Try again.' }))
@@ -362,7 +351,7 @@ export function Profiles({ device, status, client, applyAll, busy }: {
         <input className="m-text" aria-label="New profile name" placeholder="Name" maxLength={40} value={name}
           onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }} />
         <span className="m-row-control">
-          <button type="button" className="m-button" disabled={!name.trim()} onClick={add}>
+          <button type="button" className="m-button" disabled={!loaded || !name.trim()} onClick={add}>
             {list.some(p => p.name.toLowerCase() === name.trim().toLowerCase()) ? 'Update' : 'Save current'}
           </button>
         </span>

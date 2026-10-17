@@ -10,7 +10,7 @@ import {
 } from '@openmouse/protocol/razer'
 import { can } from '../mouse'
 import type { Section } from '../section'
-import { ColorField, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { ColorField, Dropdown, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import './core-extras.css'
 
 /**
@@ -81,14 +81,7 @@ function Choose<T extends string | number>({ label, options, value, onChange, di
   onChange: (value: T) => void
   disabled?: boolean
 }) {
-  const index = options.findIndex(o => o.value === value)
-  return (
-    <select className="m-select" aria-label={label} value={index < 0 ? '' : String(index)} disabled={disabled}
-      onChange={e => { const o = options[Number(e.target.value)]; if (o && o.value !== value) onChange(o.value) }}>
-      {index < 0 ? <option value="" disabled>{value == null ? '' : String(value)}</option> : null}
-      {options.map((o, i) => <option key={String(o.value)} value={String(i)}>{o.label}</option>)}
-    </select>
-  )
+  return <Dropdown label={label} options={options} value={value} onChange={onChange} disabled={disabled} />
 }
 
 function signed(v: number): string {
@@ -263,27 +256,31 @@ function liftOffRows({ status, client, apply, busy }: Section): ReactNode[] {
   const ui = status.ui ?? {}
   const canSingle = can(client, 'setLiftOffDistance')
   if (pair && can(client, 'setLiftOff')) {
+    // A mouse can hold a pair the vendor software never writes (unset, or landing above
+    // lift-off); the controls start from the nearest pair the mouse takes, so choosing
+    // Asymmetric always sends a valid one.
+    const liftOff = Math.min(pair.liftOffRange.max, Math.max(pair.liftOffRange.min, pair.landingRange.min + 1, pair.liftOff))
+    const startLanding = Math.min(pair.landingRange.max, Math.max(pair.landingRange.min, Math.min(pair.landing, liftOff - 1)))
     if (canSingle) {
       rows.push(
         <Row key="lodm" label="Lift-off mode">
           <Segmented label="Lift-off mode" options={LOD_MODE} value={pair.enabled == null ? null : pair.enabled ? 'asymmetric' : 'single'}
             onChange={v => void (v === 'asymmetric'
-              ? apply('setLiftOff', pair.liftOff, Math.min(pair.landing, pair.liftOff - 1))
+              ? apply('setLiftOff', liftOff, startLanding)
               : apply('setLiftOffDistance', status.liftOffDistance ?? 'Medium'))}
             disabled={busy} />
         </Row>,
       )
     }
     if (pair.enabled === true || !canSingle) {
-      const landing = Math.min(pair.landing, Math.max(pair.landingRange.min, pair.liftOff - 1))
       rows.push(
         <Row key="lodl" label="Lift-off">
-          <Slider label="Lift-off" min={pair.liftOffRange.min} max={pair.liftOffRange.max} step={1} value={pair.liftOff} format={String}
-            onCommit={v => void apply('setLiftOff', v, Math.min(landing, v - 1))} disabled={busy} />
+          <Slider label="Lift-off" min={pair.liftOffRange.min} max={pair.liftOffRange.max} step={1} value={liftOff} format={String}
+            onCommit={v => void apply('setLiftOff', v, Math.max(pair.landingRange.min, Math.min(startLanding, v - 1)))} disabled={busy} />
         </Row>,
         <Row key="lodg" label="Landing">
-          <Slider label="Landing" min={pair.landingRange.min} max={pair.landingRange.max} step={1} value={landing} format={String}
-            onCommit={v => void apply('setLiftOff', pair.liftOff, Math.min(v, pair.liftOff - 1))} disabled={busy} />
+          <Slider label="Landing" min={pair.landingRange.min} max={pair.landingRange.max} step={1} value={startLanding} format={String}
+            onCommit={v => void apply('setLiftOff', liftOff, Math.min(v, liftOff - 1))} disabled={busy} />
         </Row>,
       )
       return rows

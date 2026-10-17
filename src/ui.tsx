@@ -1,11 +1,13 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useGlide } from './glide'
+import { groupOf } from './section'
 
 /** A section: its name is the only bold type, its rows ruled by hairlines; it rises in when it appears. */
 export function Panel({ title, actions, children }: { title: string; children?: ReactNode; /** Buttons on the title's own line, for a panel that is only a few actions. */ actions?: ReactNode }) {
   const id = useId()
   return (
-    <section className={`m-panel m-arrive${actions ? ' has-actions' : ''}`} aria-labelledby={id}>
+    <section className={`m-panel m-arrive${actions ? ' has-actions' : ''}`} aria-labelledby={id} data-group={groupOf(title)}>
       {actions ? (
         <div className="m-panel-head">
           <h2 id={id} className="m-panel-title">{title}</h2>
@@ -176,10 +178,121 @@ export function Select({ label, options, value, onChange, disabled = false }: {
   onChange: (v: string) => void
   disabled?: boolean
 }) {
+  return <Dropdown label={label} options={options.map(o => ({ value: o, label: o }))} value={value} onChange={onChange} disabled={disabled} placeholder={value} />
+}
+
+/** One choice in a Dropdown: what is sent, what is shown, and the heading it sits under. */
+export type DropOption<T> = { value: T; label: string; group?: string; disabled?: boolean }
+
+/**
+ * Exo's dropdown: a pill like the room's other controls that opens Exo's own
+ * menu (never Windows' list), below it or above when the room ends first.
+ * Arrow keys move, Enter picks, Escape or a click elsewhere closes. A current
+ * value that is not one of the options shows as `placeholder`.
+ */
+export function Dropdown<T extends string | number>({ label, options, value, onChange, disabled = false, placeholder }: {
+  label: string
+  options: readonly DropOption<T>[]
+  value: T | null | undefined
+  onChange: (value: T) => void
+  disabled?: boolean
+  placeholder?: string
+}) {
+  const button = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLUListElement>(null)
+  const listId = useId()
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const [place, setPlace] = useState<CSSProperties>({})
+  const current = options.find(o => o.value === value)
+  const shown = current?.label ?? placeholder ?? (value == null ? '' : String(value))
+  const pickable = options.map((o, i) => (o.disabled ? -1 : i)).filter(i => i >= 0)
+
+  const show = () => {
+    const box = button.current?.getBoundingClientRect()
+    if (!box) return
+    const below = window.innerHeight - box.bottom - 8
+    const above = box.top - 8
+    const height = Math.min(320, Math.max(below, above))
+    setPlace({
+      left: Math.max(8, Math.min(box.right - Math.max(box.width, 180), window.innerWidth - 8 - Math.max(box.width, 180))),
+      minWidth: Math.max(box.width, 180),
+      maxHeight: height,
+      ...(below >= Math.min(320, options.length * 36 + 8) || below >= above ? { top: box.bottom + 4 } : { bottom: window.innerHeight - box.top + 4 }),
+    })
+    const at = options.findIndex(o => o.value === value)
+    setActive(at >= 0 ? at : pickable[0] ?? 0)
+    setOpen(true)
+  }
+  const close = (focus = true) => { setOpen(false); if (focus) button.current?.focus() }
+  const pick = (i: number) => {
+    const o = options[i]
+    if (!o || o.disabled) return
+    close()
+    if (o.value !== value) onChange(o.value)
+  }
+  const step = (by: number) => {
+    const at = pickable.indexOf(active)
+    const next = pickable[Math.max(0, Math.min(pickable.length - 1, (at < 0 ? 0 : at) + by))]
+    if (next !== undefined) setActive(next)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent) => {
+      if (!menu.current?.contains(e.target as Node) && !button.current?.contains(e.target as Node)) close(false)
+    }
+    const shut = () => close(false)
+    document.addEventListener('mousedown', away)
+    window.addEventListener('resize', shut)
+    window.addEventListener('blur', shut)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      window.removeEventListener('resize', shut)
+      window.removeEventListener('blur', shut)
+    }
+  }, [open])
+  useEffect(() => {
+    if (open) menu.current?.querySelector<HTMLElement>(`[data-i="${active}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [open, active])
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show() }
+      return
+    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); step(1) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); step(-1) }
+    else if (e.key === 'Home') { e.preventDefault(); setActive(pickable[0] ?? 0) }
+    else if (e.key === 'End') { e.preventDefault(); setActive(pickable[pickable.length - 1] ?? 0) }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(active) }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close() }
+    else if (e.key === 'Tab') close(false)
+  }
+
   return (
-    <select className="m-select" aria-label={label} value={value} disabled={disabled} onChange={e => onChange(e.target.value)}>
-      {options.includes(value) ? null : <option value={value}>{value}</option>}
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
+    <>
+      <button ref={button} type="button" className="m-select" aria-label={label} aria-haspopup="listbox" aria-expanded={open}
+        aria-controls={open ? listId : undefined} aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        disabled={disabled} onClick={() => (open ? close() : show())} onKeyDown={onKey}>
+        <span className="m-select-value">{shown}</span>
+        <svg className="m-select-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 l3 3 l3 -3" /></svg>
+      </button>
+      {open ? createPortal(
+        <ul ref={menu} id={listId} className="m-menu" role="listbox" aria-label={label} style={place}>
+          {options.map((o, i) => (
+            <Fragment key={`${String(o.value)}-${i}`}>
+              {o.group && o.group !== options[i - 1]?.group ? <li className="m-menu-group" role="presentation">{o.group}</li> : null}
+              <li id={`${listId}-${i}`} data-i={i} role="option" aria-selected={o.value === value} aria-disabled={o.disabled || undefined}
+                className={`m-menu-item${i === active ? ' is-active' : ''}${o.value === value ? ' is-on' : ''}`}
+                onMouseEnter={() => { if (!o.disabled) setActive(i) }} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}>
+                {o.label}
+              </li>
+            </Fragment>
+          ))}
+        </ul>,
+        document.body,
+      ) : null}
+    </>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Segmented } from './ui'
 
 export type Game = { id: string; title: string; cover?: string | null }
@@ -61,7 +62,8 @@ export function GamePicker({ profile, profiles, games, onToggle, onClose }: {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
+  // On the page itself: a panel's arrive animation leaves a transform that would hold a fixed overlay inside the panel.
+  return createPortal(
     <div className="m-picker-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <section className="m-picker" role="dialog" aria-modal="true" aria-labelledby="m-picker-title">
         <header className="m-picker-head">
@@ -95,6 +97,7 @@ export function GamePicker({ profile, profiles, games, onToggle, onClose }: {
           ) : null}
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }

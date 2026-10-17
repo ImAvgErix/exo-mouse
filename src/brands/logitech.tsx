@@ -18,7 +18,7 @@ import {
 } from '@openmouse/protocol/logitech'
 import { can } from '../mouse'
 import type { Section } from '../section'
-import { NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { Dropdown, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import './logitech.css'
 
 /**
@@ -59,21 +59,9 @@ function Choose<T extends string | number>({ label, options, value, onChange, di
   /** How to name a current value that is not one of the options. */
   describe?: (value: T) => string
 }) {
-  const index = options.findIndex(o => o.value === value)
   return (
-    <select
-      className="m-select"
-      aria-label={label}
-      value={index < 0 ? '' : String(index)}
-      disabled={disabled}
-      onChange={e => {
-        const picked = options[Number(e.target.value)]
-        if (picked && picked.value !== value) onChange(picked.value)
-      }}
-    >
-      {index < 0 ? <option value="" disabled>{value == null ? 'Unknown' : describe ? describe(value) : String(value)}</option> : null}
-      {options.map((o, i) => <option key={i} value={String(i)}>{o.label}</option>)}
-    </select>
+    <Dropdown label={label} options={options} value={value} onChange={onChange} disabled={disabled}
+      placeholder={value == null ? 'Unknown' : describe ? describe(value) : String(value)} />
   )
 }
 

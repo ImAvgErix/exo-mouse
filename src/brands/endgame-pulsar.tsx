@@ -3,7 +3,7 @@ import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { EGG_BUTTON_ACTION_OPTIONS } from '@openmouse/protocol/endgame-gear-op1'
 import { can } from '../mouse'
 import type { Section } from '../section'
-import { Panel, Row, Segmented, Select, Slider, Switch } from '../ui'
+import { Dropdown, Panel, Row, Segmented, Select, Slider, Switch } from '../ui'
 import './endgame-pulsar.css'
 
 /**
@@ -304,11 +304,9 @@ function EggButtons({ status: base, client, apply, busy }: Section) {
         return (
           <Row key={i} label={EGG_BUTTON_NAMES[i]}>
             {i === fixed ? <span className="m-state">{shown}</span> : (
-              <select className="m-select" aria-label={EGG_BUTTON_NAMES[i]} value={key ?? ''} disabled={busy}
-                onChange={e => { if (e.target.value) void apply('setButtonMapping', i, { key: e.target.value }) }}>
-                {key ? null : <option value="" disabled>{shown}</option>}
-                {EGG_ACTIONS.map(o => <option key={o.key} value={o.key}>{EGG_ACTION_LABEL[o.key]}</option>)}
-              </select>
+              <Dropdown label={EGG_BUTTON_NAMES[i]} options={EGG_ACTIONS.map(o => ({ value: o.key as string, label: EGG_ACTION_LABEL[o.key] }))}
+                value={key ?? null} placeholder={shown} disabled={busy}
+                onChange={v => void apply('setButtonMapping', i, { key: v })} />
             )}
           </Row>
         )

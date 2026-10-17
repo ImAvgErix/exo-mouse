@@ -13,11 +13,15 @@ import type { Candidate, Step, useMouse } from './mouse'
  * ?scale=1.25, ?motion=reduce, ?battery=12, ?charging, ?asleep, ?apart, ?lod=1.4
  * and ?fail try the room at another text size, with reduce motion, low,
  * charging, unread for minutes, with the right switch mechanical, on a
- * custom lift-off, or with a write that does not take.
+ * custom lift-off, or with a write that does not take. ?razer shows a Razer
+ * Viper V3 Pro on its HyperSpeed receiver instead, as a friend's reads it
+ * (Razer's button controls, asymmetric lift-off, low power mode), for the
+ * room with many panels.
  */
 
 const params = new URLSearchParams(location.search)
-const DEVICE = '361d:200'
+const RAZER = params.has('razer')
+const DEVICE = RAZER ? '1532:c1' : '361d:200'
 
 const START = {
   brand: 'Finalmouse',
@@ -62,6 +66,34 @@ const START = {
   firmware: ['Mouse 1.1.1', 'Dongle RF 1.1.1', 'Dongle USB 1.0.6'],
 } as unknown as MouseStatus
 
+const RAZER_START = {
+  brand: 'Razer',
+  name: 'Razer Viper V3 Pro',
+  ui: {},
+  batteryPercent: 56,
+  batteryState: 'Discharging',
+  dpi: 1600,
+  dpiStages: [1600],
+  activeDpiStage: 0,
+  pollingRateHz: 1000,
+  supportedPollingRates: [125, 500, 1000, 2000, 4000, 8000],
+  activeProfile: null,
+  unitId: null,
+  connectionType: 'Wireless',
+  connectionDetail: 'HyperSpeed receiver',
+  motionSync: null,
+  sleepTimeout: 300,
+  lowBatteryWarning: 30,
+  liftOffDistance: 'Low',
+  supportedLiftOffDistances: ['Low', 'Medium', 'High'],
+  asymmetricLiftOff: { enabled: null, liftOff: 2, landing: 26, liftOffRange: { min: 2, max: 26 }, landingRange: { min: 1, max: 25 } },
+  razerButtonMappings: {
+    leftClick: 'Left Click', rightClick: 'Right Click', mouse4: 'Mouse Button 4', mouse5: 'Mouse Button 5',
+    scrollUp: 'Scroll Up', scrollDown: 'Scroll Down', sensitivityButton: 'Disabled',
+  },
+  firmware: ['Mouse 1.14'],
+} as unknown as MouseStatus
+
 type Fields = Record<string, unknown>
 const SETTERS: Record<string, (s: Fields, ...a: number[]) => Fields> = {
   setDpi: (s, dpi) => ({ ...s, dpi }),
@@ -74,12 +106,26 @@ const SETTERS: Record<string, (s: Fields, ...a: number[]) => Fields> = {
   setIndicatorColor: (s, r, g, b) => ({ ...s, finalmouseIndicatorColor: { r, g, b } }),
   setTournamentScrollMode: (s, m) => ({ ...s, finalmouseTournamentScrollMode: m }),
   setTournamentScrollTimeout: (s, ms) => ({ ...s, finalmouseTournamentScrollTimeoutMs: ms }),
+  setPollingRate: (s, hz) => ({ ...s, pollingRateHz: hz }),
+  setSleepTimeout: (s, sec) => ({ ...s, sleepTimeout: sec }),
+  setLowPowerThreshold: (s, pct) => ({ ...s, lowBatteryWarning: pct }),
+  setLiftOffDistance: (s, d) => ({ ...s, liftOffDistance: d, asymmetricLiftOff: { ...(s.asymmetricLiftOff as object), enabled: false } }),
+  setLiftOff: (s, liftOff, landing) => ({ ...s, asymmetricLiftOff: { ...(s.asymmetricLiftOff as object), enabled: true, liftOff, landing } }),
+}
+
+/** Setters whose first argument is a name, not a number (Razer's button controls). */
+const NAMED: Record<string, (s: Fields, ...a: unknown[]) => Fields> = {
+  setButtonMapping: (s, control, mapping) => ({ ...s, razerButtonMappings: { ...(s.razerButtonMappings as object), [control as string]: mapping } }),
+  setToggleControl: (s, control, value) => ({ ...s, razerButtonMappings: { ...(s.razerButtonMappings as object), [control as string]: value } }),
 }
 
 /** A driver client as far as `can` looks: every setter above, doing nothing itself. */
-const CLIENT = Object.fromEntries(Object.keys(SETTERS).map(name => [name, async () => undefined])) as unknown as SupportedClient
+const CLIENT = {
+  ...Object.fromEntries([...Object.keys(SETTERS), ...Object.keys(NAMED)].map(name => [name, async () => undefined])),
+  getLowPowerOptions: () => [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
+} as unknown as SupportedClient
 
-const CANDIDATE = { id: DEVICE, device: {} as HIDDevice, name: 'Starlight X' } satisfies Candidate
+const CANDIDATE = { id: DEVICE, device: {} as HIDDevice, name: RAZER ? 'Viper V3 Pro' : 'Starlight X' } satisfies Candidate
 
 const GAMES = [
   { id: 'steam:730', title: 'Counter-Strike 2' },
@@ -117,7 +163,7 @@ function look() {
 }
 
 function useMockMouse(): ReturnType<typeof useMouse> {
-  const [status, setStatus] = useState(START)
+  const [status, setStatus] = useState(RAZER ? RAZER_START : START)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [readAt, setReadAt] = useState(() => Date.now() - (params.has('asleep') ? 4 * 60_000 : 0))
@@ -132,7 +178,7 @@ function useMockMouse(): ReturnType<typeof useMouse> {
       return null
     }
     let next = now.current as unknown as Fields
-    for (const [method, args] of steps) next = SETTERS[method]?.(next, ...(args as number[])) ?? next
+    for (const [method, args] of steps) next = NAMED[method]?.(next, ...args) ?? SETTERS[method]?.(next, ...(args as number[])) ?? next
     now.current = next as unknown as MouseStatus
     setStatus(now.current)
     setReadAt(Date.now())
@@ -141,7 +187,7 @@ function useMockMouse(): ReturnType<typeof useMouse> {
   }, [])
   const apply = useCallback((method: string, ...args: unknown[]) => applyAll([[method, args]]), [applyAll])
   return {
-    phase: 'ready', candidates: [CANDIDATE], current: CANDIDATE, brand: 'Finalmouse', status, error, busy,
+    phase: 'ready', candidates: [CANDIDATE], current: CANDIDATE, brand: RAZER ? 'Razer' : 'Finalmouse', status, error, busy,
     client: CLIENT, readAt, apply, applyAll, choose: () => undefined, retry: () => undefined,
   }
 }

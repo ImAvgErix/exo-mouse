@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MagneticButtonStatus, MagneticButtonsStatus, MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, type Step } from '../mouse'
 import type { Section } from '../section'
-import { Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { Dropdown, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import { ClickTest, DepthMeter, HitsSpeedTest, Overlay, PollingTest } from './magnetic-tools-tests'
 import './magnetic-tools.css'
 
@@ -353,25 +353,17 @@ function HitsPanel(section: Section) {
   return (
     <Panel title="HITS">
       <Row label="Preset">
-        <select className="m-select" aria-label="Preset" value={selected} disabled={busy}
-          onChange={e => {
-            const v = e.target.value
+        <Dropdown label="Preset" value={selected} disabled={busy} placeholder="Custom"
+          options={[
+            { value: '', label: 'Custom' },
+            ...BUILT_IN.filter(p => presetFits(p, tuning)).map(p => ({ value: `built:${p.name}`, label: p.name, group: 'Built in' })),
+            ...PRO.filter(p => presetFits(p, tuning)).map(p => ({ value: `built:${p.name}`, label: p.name, group: 'Pro players' })),
+            ...presets.map(p => ({ value: `mine:${p.name}`, label: p.name, group: 'Yours' })),
+          ]}
+          onChange={v => {
             const p = v.startsWith('mine:') ? presets.find(x => `mine:${x.name}` === v) : [...BUILT_IN, ...PRO].find(x => `built:${x.name}` === v)
             if (p) load(p)
-          }}>
-          <option value="">Custom</option>
-          <optgroup label="Built in">
-            {BUILT_IN.filter(p => presetFits(p, tuning)).map(p => <option key={p.name} value={`built:${p.name}`}>{p.name}</option>)}
-          </optgroup>
-          <optgroup label="Pro players">
-            {PRO.filter(p => presetFits(p, tuning)).map(p => <option key={p.name} value={`built:${p.name}`}>{p.name}</option>)}
-          </optgroup>
-          {presets.length ? (
-            <optgroup label="Yours">
-              {presets.map(p => <option key={p.name} value={`mine:${p.name}`}>{p.name}</option>)}
-            </optgroup>
-          ) : null}
-        </select>
+          }} />
       </Row>
       {naming !== null ? (
         <Row label="Save as">

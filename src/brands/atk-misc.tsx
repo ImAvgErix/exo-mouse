@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can } from '../mouse'
 import type { Section } from '../section'
-import { NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { Dropdown, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import './atk-misc.css'
 
 /**
@@ -34,13 +34,7 @@ function NumSelect({ label, options, value, onChange, disabled = false }: {
   onChange: (v: number) => void
   disabled?: boolean
 }) {
-  const known = options.some(o => o.value === value)
-  return (
-    <select className="am-select" aria-label={label} value={value} disabled={disabled} onChange={e => onChange(Number(e.target.value))}>
-      {known ? null : <option value={value}>{String(value)}</option>}
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  )
+  return <Dropdown label={label} options={options} value={value} onChange={onChange} disabled={disabled} />
 }
 
 const ms = (v: number) => `${v} ms`
@@ -514,7 +508,6 @@ function KsnakeMacros({ apply, busy }: Section) {
       window.removeEventListener('contextmenu', menu, true)
     }
     // stop reads the latest timing through a ref; the listeners only need to follow `recording`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recording])
 
   const start = () => {

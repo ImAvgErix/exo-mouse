@@ -1,5 +1,5 @@
 /*
- * Exo's look: void black, cream ink, Geist, hairlines and one pill. Type is
+ * Exo's look: void black, cream ink, Inter, hairlines and one pill. Type is
  * 20 / 13 / 12 (times Exo's text size, --exo-scale), 600 only for headings;
  * spacing 4 / 8 / 12 / 16 / 24 / 32; radius 14 for cards, 999 for pills.
  */
@@ -33,7 +33,7 @@ html, body, #root {
 body {
   background: var(--bg);
   color: var(--ink);
-  font: var(--type-body)/1.45 'Geist Variable', system-ui, sans-serif;
+  font: var(--type-body)/1.45 'Inter Variable', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -49,13 +49,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 /*
  * The mouse as the room's hero on the left, full height; its settings in
- * balanced columns filling the rest (columns.ts). Only the settings scroll,
- * and only when they cannot fit.
+ * whole sections, in as few columns as hold them without scrolling
+ * (layout.ts). The mouse takes what the columns leave.
  */
 .m-room {
   --gap: 16px;
   display: grid;
-  /* The settings take the columns they need (columns.ts sets --settings-w); the mouse takes the rest, at least 280 px. */
+  /* The settings take the columns they need (layout.ts sets --settings-w); the mouse takes the rest, at least 280 px. */
   grid-template-columns: minmax(280px, 1fr) var(--settings-w, minmax(0, 2fr));
   gap: var(--gap);
   height: 100%;
@@ -137,11 +137,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: var(--type-small);
 }
 
-/* The readout: battery and signal as figures over gauges, then the link and firmware, on hairlines. */
+/* The readout: one bar of figures on hairlines (battery and signal over gauges), wrapping only when the mouse is narrow. */
 .m-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(calc(132px * var(--exo-scale, 1)), 1fr));
+  margin: 16px 0 0 -1px;
 }
 
 .m-stat {
@@ -151,25 +151,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-width: 0;
   padding: 16px 24px;
   border-top: 1px solid var(--hair);
+  border-left: 1px solid var(--hair);
 }
-
-.m-stat:nth-child(even) { border-left: 1px solid var(--hair); }
-
-/* An odd one out (no signal on a wired mouse, no fixed rate) takes the row. */
-.m-stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 /* What the mouse says beside a figure's name: a voltage, a dBm, Full. */
 .m-stat-detail {
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-/* A wide hero: the readout in one line, so the picture keeps the height. */
-@container hero (min-width: 760px) {
-  .m-stats { grid-template-columns: none; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; }
-  .m-stat:last-child:nth-child(odd) { grid-column: auto; }
-  .m-stat + .m-stat { border-left: 1px solid var(--hair); }
 }
 
 .m-stat-label {
@@ -291,9 +280,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 /*
  * The columns: panels flow top to bottom and wrap at a .m-break, which
- * columns.ts places; every column is as tall as the room (or the tallest
- * column, when they scroll) and its panels stretch to its foot. The breaks
- * are zero-wide lines, so half a gap either side of one makes one gap.
+ * layout.ts places; every column is as tall as the room and its last panel
+ * reaches the foot. The breaks are zero-wide lines, so half a gap either side
+ * of one makes one gap.
  */
 .m-grid {
   display: flex;
@@ -314,15 +303,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-grid.is-measuring { flex-wrap: nowrap; height: auto; }
 
-/* One wide column of lines (columns.ts): two tracks; a single spans both, a pair shares a line and its height. */
-.m-grid.is-paired {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--gap);
-  width: var(--col-w);
-}
-
-.m-grid.is-paired > .m-panel { width: auto; }
+/* Panels keep their own height; the last in each column takes the rest, so the columns end level. */
+.m-grid.is-columns > .m-panel { flex: 0 0 auto; }
+.m-grid.is-columns > .m-panel.is-last { flex-grow: 1; }
+.m-grid > .m-panel[hidden] { display: none; }
 
 /* ------------------------------------------------------------------ panels and rows */
 
@@ -552,15 +536,79 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-number-suffix { margin-left: 4px; color: var(--faint); }
 
+/* A dropdown (ui.tsx Dropdown): a pill with its value and a chevron; it opens Exo's own menu, never Windows' list. */
 .m-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   height: 32px;
   max-width: 260px;
-  padding: 0 12px;
+  padding: 0 10px 0 12px;
   border: 1px solid var(--hair-control);
   border-radius: 999px;
   background: var(--bg);
+  color: var(--ink);
+  font-size: var(--type-small);
+  cursor: pointer;
+  transition: background-color 150ms var(--ease);
+}
+
+.m-select:disabled { cursor: default; opacity: 0.5; }
+.m-select[aria-expanded='true'] { background: var(--hover-fill); }
+
+.m-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.m-select-chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 150ms var(--ease);
+}
+
+.m-select[aria-expanded='true'] .m-select-chevron { transform: rotate(180deg); }
+
+/* Its menu: a black card over the room, the current choice marked, the pointed one in the hover fill. */
+.m-menu {
+  position: fixed;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--hair-control);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  scrollbar-width: thin;
+  animation: m-fade 120ms var(--ease) both;
+}
+
+.m-menu-group {
+  padding: 8px 10px 4px;
+  color: var(--faint);
   font-size: var(--type-small);
 }
+
+.m-menu-item {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: var(--type-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.m-menu-item.is-on { color: var(--ink); font-weight: 500; }
+.m-menu-item.is-active { background: var(--hover-fill); color: var(--ink); }
+.m-menu-item[aria-disabled='true'] { cursor: default; opacity: 0.5; }
 
 /* A colour well: a 28px dot. */
 .m-color {

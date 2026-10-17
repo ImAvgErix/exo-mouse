@@ -170,21 +170,32 @@ export function useMouse() {
     return () => window.clearInterval(timer)
   }, [state.phase, visible, hasBattery, refresh])
 
-  /** Runs setters in order, then reads the mouse back once; resolves to what the mouse took (null when a step failed). */
+  /**
+   * Runs setters in order (a failing one does not stop the rest), then reads the mouse back
+   * once; resolves to what the mouse took, or null with the first failure as the error.
+   */
   const applyAll = useCallback(async (steps: Step[]): Promise<MouseStatus | null> => {
     const c = client.current
     if (!c) return null
     writing.current++
     setState(s => ({ ...s, busy: true, error: null }))
     try {
-      for (const [method, args] of steps) if (can(c, method)) await invoke(c, method, args)
-      if (steps.some(([method]) => LEAVES_THIS_PC.has(method))) return null
+      let failed: unknown = null
+      for (const [method, args] of steps) {
+        if (!can(c, method)) continue
+        try { await invoke(c, method, args) } catch (e) { failed ??= e }
+      }
+      if (steps.some(([method]) => LEAVES_THIS_PC.has(method))) {
+        if (failed) throw failed
+        return null
+      }
       // The mouse takes a change at once but answers a read sent straight after it with
       // the old values; a short settle reads what it took, and a second read confirms it.
       await sleep(SETTLE_MS)
       const status = await c.readStatus()
       if (client.current === c) setState(s => ({ ...s, status, readAt: Date.now() }))
       window.setTimeout(() => void refresh(), CONFIRM_MS)
+      if (failed) throw failed
       return status
     } catch (e) {
       setState(s => ({ ...s, error: message(e) }))

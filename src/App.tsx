@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, useMouse } from './mouse'
 import type { Section } from './section'
@@ -11,7 +11,7 @@ import { MagneticToolsPanels } from './brands/magnetic-tools'
 import { Profiles } from './Profiles'
 import { deviceImage } from './device-images'
 import { signalLevel, signalWord, useMouseAlerts } from './alerts'
-import { useColumns } from './columns'
+import { useSections } from './layout'
 import { ColorField, NumberField, Panel, Row, Segmented, Select, Slider, Switch } from './ui'
 
 export function App() {
@@ -66,24 +66,18 @@ export function Room({ mouse }: { mouse: ReturnType<typeof useMouse> }) {
 }
 
 /** Columns a room can hold at most; one break ends each but the last. */
-const BREAKS = [0, 1, 2, 3, 4]
+const BREAKS = [0, 1, 2]
 
 /**
- * The panels in balanced columns that fill the room (columns.ts); only they
- * scroll, and only when they cannot fit. Each panel rises in turn (Exo's
- * arrive, 28 ms apart, after the mouse) when a mouse opens; a later panel
- * takes the next place.
+ * The settings in whole sections beside the mouse, with no scrolling
+ * (layout.ts). Each panel rises in turn (Exo's arrive, 28 ms apart, after the
+ * mouse) when a mouse opens.
  */
 function Settings({ children }: { children: ReactNode }) {
-  const { box, grid } = useColumns()
-  useLayoutEffect(() => {
-    grid.current?.querySelectorAll<HTMLElement>(':scope > .m-panel').forEach((panel, i) => {
-      if (!panel.style.getPropertyValue('--i')) panel.style.setProperty('--i', String(i + 1))
-    })
-  })
+  const { box, stack } = useSections()
   return (
     <div ref={box} className="m-settings">
-      <div ref={grid} className="m-grid">
+      <div ref={stack} className="m-grid">
         {children}
         {BREAKS.map(i => <span key={i} className="m-break" aria-hidden="true" />)}
       </div>
@@ -167,10 +161,10 @@ function useLanded(busy: boolean, error: string | null): number {
 }
 
 /**
- * The mouse itself, as the room's hero: its picture large (OpenMouse's
- * render, when there is one), its name and how it is linked, and a readout of
- * what the mouse reports but nobody sets: battery, signal, a fixed polling
- * rate and firmware. Each fact shows here once; settings live in the panels.
+ * The mouse itself, as the room's hero: its picture (OpenMouse's render,
+ * when there is one) in the width the settings leave, its name and how it is
+ * linked, and a readout of what the mouse reports but no panel shows:
+ * battery, signal, a fixed polling rate and firmware. Each fact shows once.
  * A light band crosses the picture while a change is being written and a
  * check draws when it lands; the last change that did not take floats at the
  * picture's foot, so nothing moves.
@@ -210,8 +204,8 @@ function Device({ status, brand, readAt, busy, error, children }: { status: Mous
         <Signal status={status} />
         {polling ? (
           <div className="m-stat">
-            <span className="m-stat-label">Polling rate</span>
-            <span className="m-stat-figure">{polling}<span className="m-stat-unit">Hz</span></span>
+            <span className="m-stat-label">Polling rate<span className="m-stat-detail">Fixed</span></span>
+            <span className="m-stat-figure">{polling >= 1000 ? `${polling / 1000}K` : polling}<span className="m-stat-unit">Hz</span></span>
           </div>
         ) : null}
         {firmware.length ? (

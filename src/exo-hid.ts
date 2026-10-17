@@ -25,6 +25,9 @@ const pending = new Map<number, { resolve: (r: Reply) => void; reject: (e: Error
 const eventHandlers = new Map<string, (data: unknown) => void>()
 let nextId = 1
 
+/** The page that frames this one (Exo runs it on its own origin); standalone, this page itself. */
+const hostOrigin = window.location.ancestorOrigins?.[0] ?? window.location.origin
+
 window.addEventListener('message', event => {
   if (event.source !== window.parent) return
   const m = event.data as { exo?: string; id?: number; result?: Reply; error?: string; event?: string; data?: unknown } | null
@@ -54,7 +57,7 @@ export function call(method: string, params: Record<string, unknown> = {}, timeo
       reject,
       timer,
     })
-    window.parent.postMessage({ exo: 'mouse', id, method, params }, window.location.origin)
+    window.parent.postMessage({ exo: 'mouse', id, method, params }, hostOrigin)
   })
 }
 
@@ -64,7 +67,7 @@ export function onHostEvent(name: string, handler: (data: unknown) => void): voi
 
 /** Tells Exo something without a reply: { notice: 'one line' } or { state: {...} | null }. */
 export function tell(message: { notice?: string; state?: { name: string; battery: number | null; charging: boolean; low: boolean } | null }): void {
-  window.parent.postMessage({ exo: 'mouse', ...message }, window.location.origin)
+  window.parent.postMessage({ exo: 'mouse', ...message }, hostOrigin)
 }
 
 // ------------------------------------------------------------------ bytes

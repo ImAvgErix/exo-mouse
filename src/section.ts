@@ -16,3 +16,23 @@ export type Section = {
   applyAll: (steps: Step[]) => Promise<MouseStatus | null>
   busy: boolean
 }
+
+/**
+ * The room's sections, in order. Every panel belongs to one, so a mouse with
+ * settings others lack still shows each of them, sorted where it reads best;
+ * a panel no list names goes to Device rather than being dropped.
+ */
+export const GROUPS = ['Sensor', 'Buttons', 'Device', 'Profiles'] as const
+export type Group = (typeof GROUPS)[number]
+
+const BY_TITLE: Record<string, Group> = {
+  Sensitivity: 'Sensor', 'CPI stages': 'Sensor', Sensor: 'Sensor', Performance: 'Sensor',
+  'DPI acceleration': 'Sensor', 'DPI indicator': 'Sensor',
+  Buttons: 'Buttons', 'Button controls': 'Buttons', 'Buttons and wheel': 'Buttons', 'Button assignments': 'Buttons',
+  'Button response': 'Buttons', 'Main switches': 'Buttons', 'Magnetic switches': 'Buttons', Clicks: 'Buttons',
+  'Multiclick filter': 'Buttons', 'Scroll wheel': 'Buttons', Scrolling: 'Buttons', 'Rapid fire': 'Buttons',
+  Macros: 'Buttons', Haptics: 'Buttons',
+  Profiles: 'Profiles',
+}
+
+export const groupOf = (title: string): Group => BY_TITLE[title] ?? 'Device'
