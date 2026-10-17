@@ -101,7 +101,7 @@ function replacesSensitivity({ status }: Section): boolean {
 
 /**
  * The whole stage table: how many stages the DPI button cycles, each stage's
- * value and colour, and which one is live. Stages are 0-based in every driver.
+ * value and color, and which one is live. Stages are 0-based in every driver.
  */
 function Sensitivity(section: Section) {
   const { status, client, apply, busy } = section
@@ -149,7 +149,7 @@ function Sensitivity(section: Section) {
           <Row key={i} label={`Stage ${i + 1}`} value={y != null && y !== dpi ? `Vertical ${y}` : status.activeDpiStage === i && stages.length > 1 ? 'Active' : undefined}>
             <span className="cx-stage">
               {canColor ? (
-                <ColorField label={`Stage ${i + 1} colour`} value={colors![i]!} disabled={busy}
+                <ColorField label={`Stage ${i + 1} color`} value={colors![i]!} disabled={busy}
                   onCommit={hex => void apply('setDpiStageColor', i, hex)} />
               ) : showColors ? <span className="m-seg-dot" style={{ background: colors![i] }} /> : null}
               {canValue ? (
@@ -388,7 +388,7 @@ function zoneName(zone: MouseLighting): string {
 }
 
 /**
- * Every lit zone: effect, colours, speed and brightness. The driver takes the
+ * Every lit zone: effect, colors, speed and brightness. The driver takes the
  * whole zone (it finds the zone by name or LED id), so each change sends the
  * zone as the mouse reported it with the one field changed.
  */
@@ -423,10 +423,10 @@ function Lighting({ status, client, apply, busy }: Section) {
           : <Choose label="Effect" options={light.modes.map(m => ({ value: m, label: sentence(m) }))} value={mode} onChange={m => set({ mode: m })} disabled={busy} />}
       </Row>
       {usesColor ? (
-        <Row label={usesColor2 ? 'Colours' : 'Colour'}>
+        <Row label={usesColor2 ? 'Colors' : 'Color'}>
           <span className="cx-pair">
-            <ColorField label="Colour" value={light.color ?? '#ffffff'} onCommit={hex => set({ color: hex })} disabled={busy} />
-            {usesColor2 ? <ColorField label="Second colour" value={light.color2 ?? '#ff0000'} onCommit={hex => set({ color2: hex })} disabled={busy} /> : null}
+            <ColorField label="Color" value={light.color ?? '#ffffff'} onCommit={hex => set({ color: hex })} disabled={busy} />
+            {usesColor2 ? <ColorField label="Second color" value={light.color2 ?? '#ff0000'} onCommit={hex => set({ color2: hex })} disabled={busy} /> : null}
           </span>
         </Row>
       ) : null}

@@ -9,7 +9,7 @@ import { ColorField, Panel, Row, Segmented, Slider } from './ui'
  * actuation 0.01-0.40 mm (default 0.25), rapid trigger 150-250 µm (default
  * 220), release point Normal 0 / Early 1 / Late 2 per side, Late only on
  * firmware 1.1.1 or newer, custom lift-off 1.0-1.7 mm on firmware 1.1.0 or
- * newer, receiver light Off 0 / Battery 1 / Custom colour 2 / TMR-DS 4. A
+ * newer, receiver light Off 0 / Battery 1 / Custom color 2 / TMR-DS 4. A
  * side whose actuation reads 0 is not calibrated and cannot go analog.
  */
 const ACTUATION_DEFAULT = 25
@@ -179,7 +179,7 @@ const BHOP = [{ value: 0, label: 'Off' }, { value: 1, label: 'Up' }, { value: 2,
 const PASS = [{ value: 100, label: '100 ms' }, { value: 500, label: '500 ms' }, { value: 1000, label: '1 s' }, { value: 1500, label: '1.5 s' }] as const
 
 type Rgb = { r: number; g: number; b: number }
-/** The receiver's custom colour (command 54), which the patched driver reads; see scripts/patch-protocol.mjs. */
+/** The receiver's custom color (command 54), which the patched driver reads; see scripts/patch-protocol.mjs. */
 export const indicatorColor = (status: MouseStatus) => (status as unknown as { finalmouseIndicatorColor?: Rgb | null }).finalmouseIndicatorColor ?? null
 const hex = ({ r, g, b }: Rgb) => `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
 const rgb = (value: string): [number, number, number] => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16)) as [number, number, number]
@@ -188,11 +188,11 @@ function Receiver({ status, client, apply, busy }: Section) {
   const color = indicatorColor(status)
   const rows = [
     status.finalmouseDongleLedMode != null && can(client, 'setDongleLedMode') && (
-      // The custom colour sits in the light's own row, beside the pill, while Custom is on.
+      // The custom color sits in the light's own row, beside the pill, while Custom is on.
       <Row key="led" label="Receiver light">
         <span className="m-inline">
           {status.finalmouseDongleLedMode === 2 && color && can(client, 'setIndicatorColor') ? (
-            <ColorField label="Light colour" value={hex(color)} disabled={busy} onCommit={v => void apply('setIndicatorColor', ...rgb(v))} />
+            <ColorField label="Light color" value={hex(color)} disabled={busy} onCommit={v => void apply('setIndicatorColor', ...rgb(v))} />
           ) : null}
           <Segmented label="Receiver light" options={LIGHT} value={status.finalmouseDongleLedMode} onChange={v => void apply('setDongleLedMode', v)} disabled={busy} />
         </span>

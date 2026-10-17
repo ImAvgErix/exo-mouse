@@ -32,7 +32,7 @@ export function Row({ label, value, children }: { label: string; value?: string;
 /** One pill; the current option filled, the fill gliding to a new choice. */
 export function Segmented<T extends string | number>({ label, options, value, onChange, disabled = false }: {
   label: string
-  /** color: a dot before the label (a DPI stage's LED colour). */
+  /** color: a dot before the label (a DPI stage's LED color). */
   options: readonly { value: T; label: string; disabled?: boolean; color?: string }[]
   value: T | null | undefined
   onChange: (value: T) => void
@@ -69,8 +69,8 @@ export function Switch({ label, checked, onChange, disabled = false }: { label: 
 }
 
 /**
- * A colour well that writes once, when the picker closes, so dragging through
- * colours does not send the mouse a command for each one.
+ * A color well that writes once, when the picker closes, so dragging through
+ * colors does not send the mouse a command for each one.
  */
 export function ColorField({ label, value, onCommit, disabled = false }: { label: string; value: string; onCommit: (hex: string) => void; disabled?: boolean }) {
   const [draft, setDraft] = useState(value)

@@ -440,8 +440,8 @@ function Lighting(section: Section) {
         <Segmented label="Effect" options={light.modes.map(m => ({ value: m, label: m }))} value={light.mode} onChange={m => set({ mode: m })} disabled={busy} />
       </Row>
       {light.mode && light.colorModes.includes(light.mode) ? (
-        <Row label="Colour">
-          <ColorField label="Colour" value={light.color ?? '#ffffff'} disabled={busy} onCommit={color => set({ color })} />
+        <Row label="Color">
+          <ColorField label="Color" value={light.color ?? '#ffffff'} disabled={busy} onCommit={color => set({ color })} />
         </Row>
       ) : null}
       {light.brightnessLevels?.length ? (

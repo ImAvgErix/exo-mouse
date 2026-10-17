@@ -363,7 +363,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-dpi .m-slider { width: 220px; }
 
-/* Two controls for one thing in one row: lift-off's custom slider and presets, the receiver's colour and light. */
+/* Two controls for one thing in one row: lift-off's custom slider and presets, the receiver's color and light. */
 .m-lod,
 .m-inline {
   display: flex;
@@ -610,7 +610,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .m-menu-item.is-active { background: var(--hover-fill); color: var(--ink); }
 .m-menu-item[aria-disabled='true'] { cursor: default; opacity: 0.5; }
 
-/* A colour well: a 28px dot. */
+/* A color well: a 28px dot. */
 .m-color {
   width: 28px;
   height: 28px;
