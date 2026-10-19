@@ -2,6 +2,12 @@
 //   exo/hover-fill      a :hover rule never paints a see-through white background; use var(--hover-fill).
 //   exo/no-hover-fade   a :hover rule never lowers opacity (opacity: 1 to reveal a control is fine).
 //   exo/type-scale      font sizes come from the scale; anything else is a named exception in css-design.config.mjs.
+//   exo/one-slider      a range's track and knob (::-webkit-slider-*, ::-moz-range-*) are drawn only in config.sliderFiles.
+//   exo/control-fill    a control (a selector ending in a btn, button, chip, pill, tab, cta, toggle,
+//                       play, primary, trigger or go class) paints its background with a token (var(--...)),
+//                       transparent, none or #000, never a literal gray.
+//   exo/art-edge        art (a selector ending in a cover, poster, -art, artwork, thumb or avatar class) has no ring
+//                       on its edge: no inset 0 0 0 shadow and no visible border. A ring is an outline outside it.
 // A genuine exception at one declaration: `/* design-disable-next-line <rule> -- why */` (the why is required).
 // Plain PostCSS (already in the toolchain through Vite) rather than Stylelint, whose glob dependency
 // carries a high-severity advisory with no fixed release.
@@ -15,6 +21,7 @@ const [configPath = 'css-design.config.mjs', dir = 'src'] = process.argv.slice(2
 const config = (await import(pathToFileURL(path.resolve(configPath)).href)).default
 const sizes = new Set(config.sizes ?? [])
 const exceptions = config.exceptions ?? []
+const sliderFiles = new Set((config.sliderFiles ?? []).map((f) => path.normalize(f)))
 
 const isHover = (rule) => rule?.type === 'rule' && /:hover\b/.test(rule.selector)
 const num = (s) => (s.endsWith('%') ? parseFloat(s) / 100 : parseFloat(s))
@@ -35,6 +42,23 @@ export function translucentWhite(value) {
   }
   return false
 }
+
+/** A control's own selector: its last compound names a button-like class (not a part of one, like -label or -icon). */
+const isControl = (selector) => selector.split(',').some((s) => {
+  const last = s.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? ''
+  if (/::(before|after)/.test(last)) return false
+  return /\.(?!is-|has-)[a-z0-9-]*(btn|button|chip|pill|tab|cta|toggle|play|primary|trigger|go)(?![a-z0-9_-])/.test(last.replace(/::?[a-z-]+(\([^)]*\))?/g, ''))
+})
+/** Art's own selector: its last compound names a picture class (not a state, a pseudo-element or hover/focus). */
+const isArt = (selector) => selector.split(',').some((s) => {
+  const last = s.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? ''
+  return !/::(before|after)|:hover|:focus/.test(last) && /\.(?!is-)[a-z0-9-]*(cover|poster|-art|artwork|thumb|avatar)(?![a-z0-9_-])/.test(last)
+})
+const ringOnEdge = (decl) => (decl.prop === 'box-shadow' && /inset 0 0 0/.test(decl.value)) ||
+  (decl.prop === 'border' && !/^(0|none)\b/.test(decl.value.trim()) && !/transparent/.test(decl.value))
+
+/** A fill from the palette: a token, nothing, or the page's black. Gradients and images are art, not fills. */
+const tokenFill = (value) => /^(var\(--[a-z0-9-]+\)|transparent|none|inherit|currentcolor|#000|#000000)$/i.test(norm(value)) || /gradient|url\(/.test(value)
 
 /** On scale: calc(Npx * var(--exo-scale, 1)) with N in sizes, a type token, inherit, or 0 (text hidden). */
 function onScale(value) {
@@ -67,6 +91,15 @@ function check(file, root) {
   root.walkDecls(/^background(-color|-image)?$/, (decl) => {
     if (isHover(decl.parent) && translucentWhite(decl.value))
       report(file, decl, 'exo/hover-fill', `A hover background is never see-through white ("${decl.value}"): use var(--hover-fill)`)
+    else if (decl.prop !== 'background-image' && decl.parent?.type === 'rule' && isControl(decl.parent.selector) && !tokenFill(decl.value))
+      report(file, decl, 'exo/control-fill', `A control's fill is a token ("${decl.value}"): var(--exo-fill), var(--hover-fill), var(--exo-selected), var(--color-fg) or transparent`)
+  })
+  root.walkDecls(/^(box-shadow|border)$/, (decl) => {
+    if (decl.parent?.type === 'rule' && isArt(decl.parent.selector) && ringOnEdge(decl))
+      report(file, decl, 'exo/art-edge', `Art has no ring on its edge ("${decl.prop}: ${decl.value}"): it shows only in the antialiased corner; draw an outline outside the art`)
+  })
+  if (!sliderFiles.has(path.normalize(file))) root.walkRules(/::-(webkit-slider|moz-range)-/, (rule) => {
+    problems.push(`${file}:${rule.source?.start?.line ?? 0}  a range's track and knob are drawn once, in ${[...sliderFiles].join(' or ') || 'the slider file'} (exo/one-slider)`)
   })
   root.walkDecls('opacity', (decl) => {
     const v = decl.value.trim()

@@ -155,26 +155,24 @@ export function PollingTest({ reportedHz }: { reportedHz: number | null }) {
   }, [phase])
 
   const start = () => { setResult(null); setLive(0); setElapsed(0); setPhase('run') }
+  const shown = phase === 'done' && result && result.events >= 40 ? result : null
 
   return (
     <>
       <div className={`mt-pad${phase === 'run' ? ' is-big' : ''}`} onPointerDown={() => phase !== 'run' && start()}>
-        {phase === 'run' ? (elapsed === 0 ? 'Move the mouse' : hzText(live)) : phase === 'done' ? 'Click to run again' : 'Click, then move the mouse in circles'}
+        {phase === 'run' ? (elapsed === 0 ? 'Move the mouse' : hzText(live))
+          : phase === 'done' ? (shown ? 'Click to run again' : 'Not enough movement. Click to run again')
+            : 'Click, then move the mouse in circles'}
       </div>
-      {phase === 'run' ? <div className="mt-progress"><span style={{ width: `${(elapsed / SAMPLE_MS) * 100}%` }} /></div> : null}
-      {phase === 'done' ? (
-        result && result.events >= 40 ? (
-          <>
-            <Row label="Average"><span className="m-state">{hzText(result.avg)}</span></Row>
-            <Row label="Peak"><span className="m-state">{hzText(result.peak)}</span></Row>
-            <Row label="Lowest 5%"><span className="m-state">{hzText(result.low5)}</span></Row>
-            <Row label="Stability"><span className="m-state">{`${result.stability.toFixed(0)}%`}</span></Row>
-            <Row label="Dropouts"><span className="m-state">{result.dropouts}</span></Row>
-            <Row label="Samples"><span className="m-state">{result.events.toLocaleString()}</span></Row>
-            {reportedHz ? <Row label="Set on the mouse"><span className="m-state">{hzText(reportedHz)}</span></Row> : null}
-          </>
-        ) : <p className="mt-message">Not enough movement.</p>
-      ) : null}
+      {/* The bar and the report keep their place before and during a run, so the panel never changes
+          height under the pointer and the room does not re-lay out mid-test. */}
+      <div className="mt-progress"><span style={{ width: `${phase === 'run' ? (elapsed / SAMPLE_MS) * 100 : phase === 'done' ? 100 : 0}%` }} /></div>
+      <Row label="Average"><span className="m-state">{shown ? hzText(shown.avg) : '-'}</span></Row>
+      <Row label="Peak"><span className="m-state">{shown ? hzText(shown.peak) : '-'}</span></Row>
+      <Row label="Lowest 5%"><span className="m-state">{shown ? hzText(shown.low5) : '-'}</span></Row>
+      <Row label="Stability"><span className="m-state">{shown ? `${shown.stability.toFixed(0)}%` : '-'}</span></Row>
+      <Row label="Dropouts"><span className="m-state">{shown ? shown.dropouts : '-'}</span></Row>
+      <Row label="Set on the mouse"><span className="m-state">{reportedHz ? hzText(reportedHz) : '-'}</span></Row>
     </>
   )
 }

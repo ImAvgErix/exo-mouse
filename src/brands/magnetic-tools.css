@@ -142,3 +142,10 @@
 }
 
 .mt-message.is-bad { color: var(--bad); }
+
+/* On the page, Exo's look: a filled pad (no outline) to move and click on. */
+.mt-pad {
+  border-color: transparent;
+  background: var(--fill, #121212);
+  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.05);
+}

@@ -22,7 +22,7 @@ export type Section = {
  * settings others lack still shows each of them, sorted where it reads best;
  * a panel no list names goes to Device rather than being dropped.
  */
-export const GROUPS = ['Sensor', 'Buttons', 'Device', 'Profiles'] as const
+export const GROUPS = ['Sensor', 'Buttons', 'Device', 'Profiles', 'Tests'] as const
 export type Group = (typeof GROUPS)[number]
 
 const BY_TITLE: Record<string, Group> = {
@@ -33,6 +33,7 @@ const BY_TITLE: Record<string, Group> = {
   'Multiclick filter': 'Buttons', 'Scroll wheel': 'Buttons', Scrolling: 'Buttons', 'Rapid fire': 'Buttons',
   Macros: 'Buttons', Haptics: 'Buttons',
   Profiles: 'Profiles',
+  'Polling test': 'Tests', 'Click test': 'Tests', 'HITS speed': 'Tests',
 }
 
 export const groupOf = (title: string): Group => BY_TITLE[title] ?? 'Device'

@@ -453,17 +453,18 @@ function TestsPanel(section: Section) {
     && can(client, 'onAnalogPress') && can(client, 'startAnalogPressStream') && can(client, 'stopAnalogPressStream')
   const close = useCallback(() => setOpen(null), [])
   const run = (test: Test, name: string) => <button type="button" className="m-button" onClick={() => setOpen(test)}>{name}</button>
-  // Each test is one button on the panel's own line; it opens over the room.
+  // The polling and click tests live on the page, ready to use: their pads are what you test on.
+  // HITS speed needs the press stream armed, so it stays a button that opens over the room.
   return (
-    <Panel title="Tests" actions={<>
-      {run('polling', 'Polling rate')}
-      {run('clicks', 'Clicks and bounce')}
-      {hits ? run('hits', 'HITS speed') : null}
-    </>}>
-      {open === 'polling' ? <Overlay title="Polling rate" onClose={close}><PollingTest reportedHz={status.pollingRateHz || null} /></Overlay> : null}
-      {open === 'clicks' ? <Overlay title="Clicks and bounce" onClose={close}><ClickTest /></Overlay> : null}
-      {open === 'hits' && hits ? <HitsTest section={section} onClose={close} /> : null}
-    </Panel>
+    <>
+      <Panel title="Polling test"><PollingTest reportedHz={status.pollingRateHz || null} /></Panel>
+      <Panel title="Click test"><ClickTest /></Panel>
+      {hits ? (
+        <Panel title="HITS speed" actions={run('hits', 'Start')}>
+          {open === 'hits' ? <HitsTest section={section} onClose={close} /> : null}
+        </Panel>
+      ) : null}
+    </>
   )
 }
 

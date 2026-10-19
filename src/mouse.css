@@ -5,15 +5,22 @@
  */
 :root {
   --bg: #000;
-  --hair: #1c1c1c;
+  --hair: #1f1f1f;
   --hair-control: #242424;
   --line-soft: #161616;
-  --selected: #1c1c1c;
+  --selected: #262626;
+  /* Exo's system (DESIGN.md › System): filled controls, floating panels. */
+  --fill: #121212;
+  --float: #0b0b0b;
   /* A hovered control: solid, so nothing shows through it (Exo's --hover-fill). */
-  --hover-fill: #141414;
-  --ink: #eeeeee;
-  --muted: #999999;
-  --faint: #777777;
+  --hover-fill: #1a1a1a;
+  /* A primary (cream) control under the pointer (Exo's --exo-primary-hover). */
+  --primary-hover: #fff;
+  /* The off half of a switch and the empty part of a slider (Exo's --exo-track). */
+  --track: #2c2c2c;
+  --ink: #f2ede4;
+  --muted: #a29d93;
+  --faint: #78746c;
   --good: #3dd68c;
   --bad: #ff5c5c;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
@@ -107,11 +114,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   pointer-events: none;
 }
 
+/* Never larger than the render itself (700 px): enlarged, a render goes soft. */
 .m-hero-image {
   position: absolute;
-  inset: 32px;
-  width: calc(100% - 64px);
-  height: calc(100% - 64px);
+  inset: 0;
+  width: min(calc(100% - 64px), 700px);
+  height: min(calc(100% - 64px), 700px);
+  margin: auto;
   object-fit: contain;
   user-select: none;
 }
@@ -305,7 +314,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 /* Panels keep their own height; the last in each column takes the rest, so the columns end level. */
 .m-grid.is-columns > .m-panel { flex: 0 0 auto; }
-.m-grid.is-columns > .m-panel.is-last { flex-grow: 1; }
+/* Panels keep their own height: a column ends where its settings end, never as an empty card. */
+.m-grid.is-columns > .m-panel { flex-grow: 0; }
 .m-grid > .m-panel[hidden] { display: none; }
 
 /* ------------------------------------------------------------------ panels and rows */
@@ -490,22 +500,38 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-width: 0;
 }
 
+/* Exo's slider, value for value (ui/src/styles/chrome.css): a 4px track filled cream over the track gray, a 14px cream knob. */
 .m-slider input {
   flex: 1;
   min-width: 0;
-  height: 4px;
+  height: 20px;
+  margin: 0;
   appearance: none;
+  /* The keyboard focus ring is a capsule around the track, as in Exo. */
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--ink) var(--fill), var(--hair-control) var(--fill));
+  background: transparent;
   cursor: pointer;
 }
 
-.m-slider input::-webkit-slider-thumb {
-  width: 16px;
-  height: 16px;
-  appearance: none;
+.m-slider input::-webkit-slider-runnable-track {
+  height: 4px;
   border-radius: 999px;
+  background: linear-gradient(90deg, var(--ink) var(--fill), var(--track) var(--fill));
+}
+
+.m-slider input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  appearance: none;
+  border-radius: 50%;
   background: var(--ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+
+.m-slider input:disabled {
+  cursor: default;
+  opacity: 0.4;
 }
 
 .m-slider-value {
@@ -651,7 +677,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 @media (hover: hover) and (pointer: fine) {
   .m-button:not(:disabled):not(.is-primary):hover { background: var(--hover-fill); }
-  .m-button.is-primary:not(:disabled):hover { background-color: #fff; box-shadow: 0 0 0 3px rgb(255 255 255 / 0.14); }
+  .m-button.is-primary:not(:disabled):hover { background-color: var(--primary-hover); }
 }
 
 .m-actions { gap: 12px; align-items: center; }
@@ -659,6 +685,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .m-link {
   padding: 0;
   border: 0;
+  /* A text button still gets a rounded focus ring. */
+  border-radius: 4px;
   background: transparent;
   color: var(--muted);
   font-size: var(--type-small);
@@ -1086,4 +1114,82 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   :root:not([data-exo-motion]) .m-glide::before {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------------- system */
+
+/* Exo's system, as in Exo's own rooms (ui/src/styles/system.css): panels float as the near-black
+   material with a cream rim, controls are filled capsules with no outline, switches are 40×24
+   with a round cream knob, gray off and green on. */
+.m-panel,
+.m-hero {
+  border-color: var(--hair);
+  border-radius: 18px;
+  background: var(--float);
+  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.06);
+}
+
+.m-seg,
+.m-number,
+.m-select,
+.m-button,
+.m-text,
+.m-color {
+  border-color: transparent;
+  background-color: var(--fill);
+  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.05);
+}
+
+.m-menu,
+.m-picker {
+  border-color: var(--hair);
+  background: var(--float);
+  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.06), 0 16px 40px rgb(0 0 0 / 0.55);
+}
+
+.m-switch {
+  width: 40px;
+  height: 24px;
+  padding: 0 2px;
+  background: var(--track);
+}
+
+.m-switch-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+
+.m-switch[aria-checked='true'] { background: var(--good); }
+.m-switch[aria-checked='true'] .m-switch-knob { transform: translateX(16px); background: var(--ink); }
+
+/* Menus as in Exo's rooms: the floating material, 34px rows rounded 8px, 13px text, the hover
+   gray, and the current choice marked with a check on the right. */
+.m-menu {
+  padding: 5px;
+  border-color: var(--hair);
+  border-radius: 14px;
+  background: var(--float);
+}
+
+.m-menu-item {
+  min-height: 34px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: var(--type-body);
+  font-weight: 500;
+}
+
+.m-menu-item.is-on::after {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  padding-left: 16px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") right center / 14px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") right center / 14px no-repeat;
 }

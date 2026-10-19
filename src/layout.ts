@@ -9,6 +9,8 @@ const COLUMN_MAX = 520
 /** The mouse keeps at least this width, and the columns leave it this much when they can; it takes the rest. */
 const HERO_MIN = 240
 const HERO_WANT = 400
+/** The most the mouse takes: past this the room adds a column of settings instead of empty space around the picture. */
+const HERO_MAX = 900
 const MAX_COLUMNS = 4
 /** Row heights, roomiest first: rows are squeezed before a column is added. */
 const ROWS = [48, 44, 40, 36]
@@ -112,6 +114,9 @@ export function useSections() {
       Math.round(Math.min(COLUMN_MAX * k, Math.max(COLUMN_MIN * k, (width - HERO_WANT * k - count * gap) / count)))
     let most = 1
     while (most < MAX_COLUMNS && (most + 1) * (columnFor(most + 1) + gap) <= width - HERO_MIN * k) most++
+    // On a wide room, start at the column count that keeps the mouse within HERO_MAX.
+    let start = 1
+    while (start < most && width - start * (columnFor(start) + gap) > HERO_MAX) start++
     const height = b.clientHeight
 
     // Sections in order; each is its panels.
@@ -129,7 +134,7 @@ export function useSections() {
     type Choice = { columnOf: number[]; column: number; rows: number; tallest: number; heights: number[] }
     let choice: Choice | null = null
     let fallback: Choice | null = null
-    for (let count = 1; count <= most && !choice; count++) {
+    for (let count = start; count <= most && !choice; count++) {
       const column = columnFor(count)
       const tried = ROWS.map(rows => ({ rows, heights: measure(column, rows) }))
       for (const { rows, heights } of tried) {
