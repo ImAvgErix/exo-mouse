@@ -59,7 +59,7 @@ export function Segmented<T extends string | number>({ label, options, value, on
   )
 }
 
-/** Exo's switch: a dark track, cream when on. */
+/** Exo's switch: a dark track, white when on. */
 export function Switch({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} className="m-switch" disabled={disabled} onClick={() => onChange(!checked)}>
