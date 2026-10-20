@@ -13,7 +13,9 @@ import type { Candidate, Step, useMouse } from './mouse'
  * ?scale=1.25, ?motion=reduce, ?battery=12, ?charging, ?asleep, ?apart, ?lod=1.4
  * and ?fail try the room at another text size, with reduce motion, low,
  * charging, unread for minutes, with the right switch mechanical, on a
- * custom lift-off, or with a write that does not take. ?razer shows a Razer
+ * custom lift-off, or with a write that does not take. ?firmware=1.0.9 is an
+ * older Starlight X (no release points reported, no custom lift-off, no Late);
+ * ?unread one whose mouse slept through the read (only the receiver answered). ?razer shows a Razer
  * Viper V3 Pro on its HyperSpeed receiver instead, as a friend's reads it
  * (Razer's button controls, asymmetric lift-off, low power mode), for the
  * room with many panels.
@@ -22,6 +24,9 @@ import type { Candidate, Step, useMouse } from './mouse'
 const params = new URLSearchParams(location.search)
 const RAZER = params.has('razer')
 const DEVICE = RAZER ? '1532:c1' : '361d:200'
+const FIRMWARE = params.get('firmware') ?? '1.1.1'
+const OLD = FIRMWARE !== '1.1.1'
+const UNREAD = params.has('unread')
 
 const START = {
   brand: 'Finalmouse',
@@ -47,23 +52,23 @@ const START = {
   finalmouseIndicatorColor: { r: 61, g: 214, b: 140 },
   finalmouseTournamentScrollMode: 1,
   finalmouseTournamentScrollTimeoutMs: 500,
-  finalmouseClickModeL: 1,
-  finalmouseClickModeR: params.has('apart') ? 0 : 1,
-  finalmouseClickReleaseL: 0,
-  finalmouseClickReleaseR: 0,
+  finalmouseClickModeL: UNREAD ? null : 1,
+  finalmouseClickModeR: UNREAD ? null : params.has('apart') ? 0 : 1,
+  finalmouseClickReleaseL: OLD || UNREAD ? null : 0,
+  finalmouseClickReleaseR: OLD || UNREAD ? null : 0,
   finalmouseTmrThrL: 25,
   finalmouseTmrThrR: 25,
   finalmouseTmrHystL: 220,
   finalmouseTmrHystR: 220,
   finalmouseTmrMspL: null,
   finalmouseTmrMspR: null,
-  finalmousePawLodMm: params.has('lod') ? Number(params.get('lod')) : 1,
+  finalmousePawLodMm: UNREAD ? null : params.has('lod') ? Number(params.get('lod')) : 1,
   finalmousePawLodCustom: params.has('lod'),
   finalmouseProfileCount: 3,
   finalmouseProfileActive: 0,
   finalmouseProfileEnabledMask: 0b111,
   finalmouseProfileNames: { 0: 'Profile 1', 1: 'Profile 2', 2: 'Profile 3' },
-  firmware: ['Mouse 1.1.1', 'Dongle RF 1.1.1', 'Dongle USB 1.0.6'],
+  firmware: UNREAD ? ['Dongle RF 1.1.1'] : [`Mouse ${FIRMWARE}-5289564`, 'Dongle RF 1.1.1'],
 } as unknown as MouseStatus
 
 const RAZER_START = {

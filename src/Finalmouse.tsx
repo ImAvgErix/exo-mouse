@@ -20,7 +20,7 @@ const CUSTOM_LOD_FIRMWARE = '1.1.0'
 const CLICK = [{ value: 0, label: 'Mechanical' }, { value: 1, label: 'Analog' }] as const
 const RELEASE = [{ value: 0, label: 'Normal' }, { value: 1, label: 'Early' }, { value: 2, label: 'Late' }] as const
 
-/** Every version the mouse reports ("Mouse 1.1.1", "Dongle RF 1.1.1"), by what it is for. */
+/** Every version the mouse reports ("Mouse 1.1.1-5289564", "Dongle RF 1.1.1"), by what it is for. */
 function firmware(status: MouseStatus): Map<string, string> {
   const map = new Map<string, string>()
   for (const line of status.firmware ?? []) {
@@ -39,15 +39,31 @@ function older(version: string, than: string): boolean {
   return false
 }
 
-/** True when every version the mouse reports is at least `version`, and it reported the mouse's own. */
-export function finalmouseFirmwareAtLeast(status: MouseStatus, version: string): boolean {
-  const all = firmware(status)
-  return all.has('mouse') && [...all.values()].every(v => !older(v, version))
+/**
+ * Whether the mouse's own firmware (which holds these settings) is at least `version`; null when the
+ * mouse has not said, so a setting is offered rather than hidden. The receiver's versions are numbered
+ * on their own and gate nothing.
+ */
+function firmwareAtLeast(status: MouseStatus, version: string): boolean | null {
+  const mouse = firmware(status).get('mouse')
+  return mouse ? !older(mouse, version) : null
 }
 
-/** The Starlight X's custom lift-off, 1.0-1.7 mm, when its firmware has it or it is already set. */
-export function finalmouseCustomLod(status: MouseStatus): boolean {
-  return !!status.finalmousePawLodCustom || finalmouseFirmwareAtLeast(status, CUSTOM_LOD_FIRMWARE)
+/**
+ * Why a Starlight X setting shows no value: the mouse did not answer the read (asleep or out of
+ * range: it reports its firmware when it does), or its firmware does not report that setting.
+ */
+export function finalmouseUnread(status: MouseStatus): string {
+  return firmware(status).has('mouse') ? 'Not reported by this firmware' : 'Move the mouse to read it'
+}
+
+/**
+ * The Starlight X's custom lift-off, 1.0-1.7 mm: offered unless the mouse's firmware is known to be
+ * older than it (then `needs` says which it needs), and always when it is already set.
+ */
+export function finalmouseCustomLod(status: MouseStatus): { offered: boolean; needs: string | null } {
+  const offered = !!status.finalmousePawLodCustom || firmwareAtLeast(status, CUSTOM_LOD_FIRMWARE) !== false
+  return { offered, needs: offered ? null : `Custom needs firmware ${CUSTOM_LOD_FIRMWARE}` }
 }
 
 /**
@@ -78,27 +94,53 @@ type SideSetters = { click: (v: number) => void; thr: (v: number) => void; rt: (
  */
 function Switches({ status, client, apply, busy }: Section) {
   const [pick, setPick] = useState<'both' | 'apart' | null>(null)
+  if (!can(client, 'setClickMode')) return null
   const modeL = status.finalmouseClickModeL
   const modeR = status.finalmouseClickModeR
-  if (modeL == null || modeR == null || !can(client, 'setClickMode')) return null
+  const mask = status.finalmouseProfileEnabledMask
+  const profiles = Array.from({ length: status.finalmouseProfileCount ?? 0 }, (_, i) => i)
+    .filter(i => mask == null || (mask & (1 << i)) !== 0 || i === status.finalmouseProfileActive)
+  const profileRow = profiles.length > 1 && can(client, 'setActiveProfile') ? (
+    <Row label="Onboard profile">
+      <Segmented
+        label="Onboard profile"
+        options={profiles.map(i => ({ value: i, label: status.finalmouseProfileNames?.[i] || String(i + 1) }))}
+        value={status.finalmouseProfileActive}
+        onChange={v => void apply('setActiveProfile', v)}
+        disabled={busy}
+      />
+    </Row>
+  ) : null
+  const unread = finalmouseUnread(status)
+  // Modes not read (the mouse asleep at the read, or a firmware that does not report them): both sides
+  // can still be set together, and the read after the write shows the rest.
+  if (modeL == null || modeR == null) {
+    return (
+      <Panel title="Main switches">
+        <Row label="Click" value={unread}>
+          <Segmented label="Click" options={CLICK} value={null} onChange={v => void apply('setClickMode', v, v)} disabled={busy} />
+        </Row>
+        {profileRow}
+      </Panel>
+    )
+  }
   const relL = status.finalmouseClickReleaseL
   const relR = status.finalmouseClickReleaseR
   const left: Side = { mode: modeL, calibrated: status.finalmouseTmrThrL !== 0, thr: status.finalmouseTmrThrL || ACTUATION_DEFAULT, rt: status.finalmouseTmrHystL ?? RT_DEFAULT, rel: relL }
   const right: Side = { mode: modeR, calibrated: status.finalmouseTmrThrR !== 0, thr: status.finalmouseTmrThrR || ACTUATION_DEFAULT, rt: status.finalmouseTmrHystR ?? RT_DEFAULT, rel: relR }
   const releases = relL != null && relR != null
-  const late = relL === 2 || relR === 2 || finalmouseFirmwareAtLeast(status, LATE_FIRMWARE)
-  const release = late ? RELEASE : RELEASE.filter(o => o.value !== 2)
+  // Late: on firmware 1.1.1 or newer, or when the mouse's firmware is not known; dimmed, with why, on older.
+  const lateNeeds = relL !== 2 && relR !== 2 && firmwareAtLeast(status, LATE_FIRMWARE) === false ? `Late needs firmware ${LATE_FIRMWARE}` : null
+  const release = lateNeeds ? RELEASE.map(o => ({ ...o, disabled: o.value === 2 })) : RELEASE
   const actuation = can(client, 'setTmrActuation')
   const tmr = (l: number, r: number, hl: number, hr: number) => void apply('setTmrActuation', l / 100, r / 100, hl, hr)
-  // The mouse takes both sides in one command; release points ride along only when it reported them.
+  // The mouse takes both sides in one command. Release points ride along once it reported them or one
+  // is picked (the other side Normal); a firmware without them reads back none, and the row says so.
   const setModes = (l: number, r: number, rl = relL, rr = relR) =>
-    void (releases ? apply('setClickMode', l, r, rl, rr) : apply('setClickMode', l, r))
+    void (rl != null || rr != null ? apply('setClickMode', l, r, rl ?? 0, rr ?? 0) : apply('setClickMode', l, r))
   const pairable = left.calibrated && right.calibrated
   const alike = left.mode === right.mode && left.thr === right.thr && left.rt === right.rt && left.rel === right.rel
   const together = pairable && (pick ?? (alike ? 'both' : 'apart')) === 'both'
-  const mask = status.finalmouseProfileEnabledMask
-  const profiles = Array.from({ length: status.finalmouseProfileCount ?? 0 }, (_, i) => i)
-    .filter(i => mask == null || (mask & (1 << i)) !== 0 || i === status.finalmouseProfileActive)
 
   const rows = (name: string, side: Side, set: SideSetters) => {
     const label = (what: string) => (name ? `${name} ${what.toLowerCase()}` : what)
@@ -115,15 +157,13 @@ function Switches({ status, client, apply, busy }: Section) {
               <Slider label={label('Actuation')} min={1} max={40} step={1} value={side.thr} format={v => `${(v / 100).toFixed(2)} mm`}
                 onCommit={set.thr} disabled={busy} />
             </Row>
-            <Row label={label('Rapid trigger')}>
+            <Row label={label('Rapid trigger')} value={status.finalmouseTmrHystL == null ? unread : undefined}>
               <Slider label={label('Rapid trigger')} min={150} max={250} step={10} value={side.rt} format={v => `${v} µm`}
                 onCommit={set.rt} disabled={busy} />
             </Row>
-            {releases ? (
-              <Row label={label('Release')}>
-                <Segmented label={label('Release')} options={release} value={side.rel} onChange={set.rel} disabled={busy} />
-              </Row>
-            ) : null}
+            <Row label={label('Release')} value={releases ? lateNeeds ?? undefined : unread}>
+              <Segmented label={label('Release')} options={release} value={side.rel} onChange={set.rel} disabled={busy} />
+            </Row>
           </>
         ) : null}
       </>
@@ -159,17 +199,7 @@ function Switches({ status, client, apply, busy }: Section) {
           })}
         </>
       )}
-      {profiles.length > 1 && can(client, 'setActiveProfile') ? (
-        <Row label="Onboard profile">
-          <Segmented
-            label="Onboard profile"
-            options={profiles.map(i => ({ value: i, label: status.finalmouseProfileNames?.[i] || String(i + 1) }))}
-            value={status.finalmouseProfileActive}
-            onChange={v => void apply('setActiveProfile', v)}
-            disabled={busy}
-          />
-        </Row>
-      ) : null}
+      {profileRow}
     </Panel>
   )
 }
@@ -184,12 +214,17 @@ export const indicatorColor = (status: MouseStatus) => (status as unknown as { f
 const hex = ({ r, g, b }: Rgb) => `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
 const rgb = (value: string): [number, number, number] => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16)) as [number, number, number]
 
+/**
+ * The receiver's light, Bhop mode and its pass-through window. A value the receiver did not report
+ * shows with nothing picked and why, and can still be set.
+ */
 function Receiver({ status, client, apply, busy }: Section) {
   const color = indicatorColor(status)
+  const unread = finalmouseUnread(status)
   const rows = [
-    status.finalmouseDongleLedMode != null && can(client, 'setDongleLedMode') && (
+    can(client, 'setDongleLedMode') && (
       // The custom color sits in the light's own row, beside the pill, while Custom is on.
-      <Row key="led" label="Receiver light">
+      <Row key="led" label="Receiver light" value={status.finalmouseDongleLedMode == null ? unread : undefined}>
         <span className="m-inline">
           {status.finalmouseDongleLedMode === 2 && color && can(client, 'setIndicatorColor') ? (
             <ColorField label="Light color" value={hex(color)} disabled={busy} onCommit={v => void apply('setIndicatorColor', ...rgb(v))} />
@@ -198,13 +233,13 @@ function Receiver({ status, client, apply, busy }: Section) {
         </span>
       </Row>
     ),
-    status.finalmouseTournamentScrollMode != null && can(client, 'setTournamentScrollMode') && (
-      <Row key="scroll" label="Bhop mode">
+    can(client, 'setTournamentScrollMode') && (
+      <Row key="scroll" label="Bhop mode" value={status.finalmouseTournamentScrollMode == null ? unread : undefined}>
         <Segmented label="Bhop mode" options={BHOP} value={status.finalmouseTournamentScrollMode} onChange={v => void apply('setTournamentScrollMode', v)} disabled={busy} />
       </Row>
     ),
-    !!status.finalmouseTournamentScrollMode && status.finalmouseTournamentScrollTimeoutMs != null && can(client, 'setTournamentScrollTimeout') && (
-      <Row key="pass" label="Pass-through window">
+    !!status.finalmouseTournamentScrollMode && can(client, 'setTournamentScrollTimeout') && (
+      <Row key="pass" label="Pass-through window" value={status.finalmouseTournamentScrollTimeoutMs == null ? unread : undefined}>
         <Segmented label="Pass-through window" options={PASS} value={status.finalmouseTournamentScrollTimeoutMs} onChange={v => void apply('setTournamentScrollTimeout', v)} disabled={busy} />
       </Row>
     ),

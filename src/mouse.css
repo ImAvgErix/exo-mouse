@@ -9,9 +9,22 @@
   --hair-control: #242424;
   --line-soft: #161616;
   --selected: #262626;
-  /* Exo's system (DESIGN.md › System): filled controls, floating panels. */
+  /* Exo's black liquid glass (ui/src/tokens.css › Controls, value for value): one opaque material for
+     every control, a near-black fill shaded into a wet, rounded surface; fields take it recessed. */
   --fill: #121212;
-  --float: #0b0b0b;
+  --rim:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 14px 14px -10px rgb(255 255 255 / 0.05),
+    inset 0 -10px 14px -8px rgb(0 0 0 / 0.55),
+    inset 0 -1px 0 rgb(0 0 0 / 0.6);
+  --rim-pressed:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 0 8px 12px -6px rgb(0 0 0 / 0.6);
+  --field-rim:
+    inset 0 8px 12px -6px rgb(0 0 0 / 0.75),
+    inset 0 1px 1px rgb(0 0 0 / 0.6),
+    inset 0 -1px 0 rgb(255 255 255 / 0.1);
+  --float: #000;
   /* A hovered control: solid, so nothing shows through it (Exo's --hover-fill). */
   --hover-fill: #1a1a1a;
   /* A primary (cream) control under the pointer (Exo's --exo-primary-hover). */
@@ -1126,25 +1139,40 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-color: var(--hair);
   border-radius: 18px;
   background: var(--float);
-  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.06);
+  box-shadow: none;
 }
 
+/* Controls are Exo's black liquid glass, no outline; fields recessed; primary buttons stay cream. */
 .m-seg,
-.m-number,
 .m-select,
 .m-button,
-.m-text,
 .m-color {
   border-color: transparent;
   background-color: var(--fill);
-  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.05);
+  box-shadow: var(--rim);
+}
+
+.m-number,
+.m-text {
+  border-color: transparent;
+  background-color: var(--fill);
+  box-shadow: var(--field-rim);
+}
+
+.m-button.is-primary {
+  border-color: var(--ink);
+  box-shadow: none;
+}
+
+:is(.m-select, .m-button:not(.is-primary)):active:not(:disabled) {
+  box-shadow: var(--rim-pressed);
 }
 
 .m-menu,
 .m-picker {
   border-color: var(--hair);
   background: var(--float);
-  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.06), 0 16px 40px rgb(0 0 0 / 0.55);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
 }
 
 .m-switch {

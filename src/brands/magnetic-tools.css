@@ -97,7 +97,7 @@
 }
 
 .mt-pad.is-big { font-size: calc(20px * var(--exo-scale, 1)); color: var(--ink); }
-.mt-pad.is-wait { background: #0a0a0a; }
+.mt-pad.is-wait { background: var(--bg); border-color: var(--muted); }
 .mt-pad.is-go { background: color-mix(in srgb, var(--good) 28%, transparent); border-color: var(--good); color: var(--ink); }
 
 .mt-progress {
@@ -143,9 +143,9 @@
 
 .mt-message.is-bad { color: var(--bad); }
 
-/* On the page, Exo's look: a filled pad (no outline) to move and click on. */
+/* On the page, Exo's look: a black pad with a hairline to move and click on. */
 .mt-pad {
-  border-color: transparent;
-  background: var(--fill, #121212);
-  box-shadow: inset 0 1px 0 rgb(242 237 228 / 0.05);
+  border-color: var(--hair-control);
+  background: var(--bg);
+  box-shadow: none;
 }

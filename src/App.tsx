@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, useMouse } from './mouse'
 import type { Section } from './section'
-import { FinalmousePanels, finalmouseCustomLod } from './Finalmouse'
+import { FinalmousePanels, finalmouseCustomLod, finalmouseUnread } from './Finalmouse'
 import { AtkMiscPanels } from './brands/atk-misc'
 import { CoreExtrasPanels, coreExtrasReplaces } from './brands/core-extras'
 import { EndgamePulsarPanels } from './brands/endgame-pulsar'
@@ -25,7 +25,7 @@ export function Room({ mouse }: { mouse: ReturnType<typeof useMouse> }) {
     return <Centered title={mouse.phase === 'opening' ? `Connecting to ${mouse.current?.name ?? 'your mouse'}` : 'Looking for your mouse'} working />
   }
   if (mouse.phase === 'none') {
-    return <Centered title="No supported mouse found" line="Plug in your mouse or its receiver." />
+    return <Centered title="No supported mouse found" line={mouse.error ?? 'Plug in your mouse or its receiver.'} />
   }
   if (mouse.phase === 'error' || !mouse.status) {
     return (
@@ -326,6 +326,9 @@ function Performance(section: Section) {
   const lods = (status.supportedLiftOffDistances ?? ['Low', 'Medium', 'High']).filter(v => !((ui.hideLodLow || ui.family === 'egg-ot') && v === 'Low'))
   const processing = !ui.hideProcessingCard
   const paw = status.finalmousePawLodMm
+  // A Starlight X always has its own lift-off row; one whose distance was not read shows the presets unpicked.
+  const slx = !!status.finalmouseIsSlx
+  const custom = finalmouseCustomLod(status)
   // A fixed rate (fixedPollingRate) is a fact the hero shows, not a row here.
   const rows = [
     !brandPolling && !fixedRate && can(client, 'setPollingRate') && (
@@ -334,15 +337,15 @@ function Performance(section: Section) {
           onChange={v => void apply('setPollingRate', v)} disabled={busy} />
       </Row>
     ),
-    !brandLiftOff && status.liftOffDistance != null && paw == null && can(client, 'setLiftOffDistance') && (
+    !brandLiftOff && status.liftOffDistance != null && paw == null && !slx && can(client, 'setLiftOffDistance') && (
       <Row key="lod" label="Lift-off distance">
         <Segmented label="Lift-off distance" options={lods.map(v => ({ value: v, label: v }))} value={status.liftOffDistance}
           onChange={v => void apply('setLiftOffDistance', v)} disabled={busy} />
       </Row>
     ),
-    paw != null && can(client, 'setPawLodMm') && (
-      <Row key="paw" label="Lift-off distance">
-        <PawLiftOff {...section} paw={paw} custom={finalmouseCustomLod(status) && can(client, 'setLiftOffScale')} />
+    (paw != null || slx) && can(client, 'setPawLodMm') && (
+      <Row key="paw" label="Lift-off distance" value={paw == null ? finalmouseUnread(status) : custom.needs ?? undefined}>
+        <PawLiftOff {...section} paw={paw ?? null} custom={custom.offered && can(client, 'setLiftOffScale')} />
       </Row>
     ),
     processing && !ui.hideMotionSync && status.motionSync != null && can(client, 'setMotionSync') && (
@@ -388,9 +391,9 @@ function Performance(section: Section) {
  * steps, raw 10-17) on a slider beside them. Whichever the mouse runs is the
  * lit one; the other rests dim, the slider reading Custom.
  */
-function PawLiftOff({ status, apply, busy, paw, custom }: Section & { paw: number; custom: boolean }) {
-  const isCustom = !!status.finalmousePawLodCustom
-  const raw = Math.min(17, Math.max(10, Math.round(paw * 10)))
+function PawLiftOff({ status, apply, busy, paw, custom }: Section & { paw: number | null; custom: boolean }) {
+  const isCustom = paw != null && !!status.finalmousePawLodCustom
+  const raw = Math.min(17, Math.max(10, Math.round((paw ?? 1) * 10)))
   return (
     <span className="m-lod">
       {custom ? (

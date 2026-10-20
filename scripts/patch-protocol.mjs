@@ -17,6 +17,16 @@ const files = {
   'dist/finalmouse/index.js': [
     ['        case 3: {\n            const dpi', '        case 3:\n        case 16: {\n            const dpi'],
     ['        case 4: {\n            const pollingRateHz', '        case 4:\n        case 17: {\n            const pollingRateHz'],
+    // Starlight X actuation (command 53): the decoder dropped the whole reply unless it also carried
+    // rapid trigger, so a firmware that answers the two actuation values alone lost its actuation too.
+    [
+      '            if (payload.length < 8)\n                return null;\n            const thrR',
+      '            if (payload.length < 4)\n                return null;\n            const thrR',
+    ],
+    [
+      '            return thrR === null || thrL === null || hystR === null || hystL === null\n                ? null\n                : { tmrThrR: thrR, tmrThrL: thrL, tmrHystR: hystR, tmrHystL: hystL };',
+      '            return thrR === null || thrL === null\n                ? null\n                : { tmrThrR: thrR, tmrThrL: thrL, ...(hystR === null || hystL === null ? {} : { tmrHystR: hystR, tmrHystL: hystL }) };',
+    ],
   ],
   // Starlight X receiver light, as xpanel has it (xpanel.finalmouse.com, dongle LED
   // page and its protocol chunk): command 20 takes Off 0, Battery 1, Custom colour 2
@@ -39,6 +49,15 @@ const files = {
     [
       '        await this.write(this.txReport, FINALMOUSE_COMMAND.indicatorColor, encodeFinalmouseIndicatorColor(r, g, b));\n    }',
       '        await this.write(this.txReport, FINALMOUSE_COMMAND.indicatorColor, encodeFinalmouseIndicatorColor(r, g, b));\n        this.telemetry.indicatorColor = { r, g, b };\n    }',
+    ],
+    // A Starlight X that did not answer was called an UltralightX.
+    [
+      '            throw new Error("The Finalmouse UltralightX did not return its current settings.',
+      '            throw new Error(`The ${this.displayName()} did not return its current settings.',
+    ],
+    [
+      ' Make sure the mouse is on and close xpanel or other Finalmouse software.");',
+      ' Make sure the mouse is on and close xpanel or other Finalmouse software.`);',
     ],
   ],
 }

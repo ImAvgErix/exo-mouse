@@ -75,8 +75,10 @@ export function snapshot(status: MouseStatus, client: Client): Step[] {
     const relR = status.finalmouseClickReleaseR
     if (relL != null && relR != null) add('setClickMode', status.finalmouseClickModeL, status.finalmouseClickModeR, relL, relR)
     else add('setClickMode', status.finalmouseClickModeL, status.finalmouseClickModeR)
+    // Rapid trigger rides along only where the firmware reported it.
+    const hyst = status.finalmouseTmrHystL != null && status.finalmouseTmrHystR != null ? [status.finalmouseTmrHystL, status.finalmouseTmrHystR] : []
     if (status.finalmouseTmrThrL && status.finalmouseTmrThrR)
-      add('setTmrActuation', status.finalmouseTmrThrL / 100, status.finalmouseTmrThrR / 100, status.finalmouseTmrHystL, status.finalmouseTmrHystR)
+      add('setTmrActuation', status.finalmouseTmrThrL / 100, status.finalmouseTmrThrR / 100, ...hyst)
     const color = indicatorColor(status)
     if (color) add('setIndicatorColor', color.r, color.g, color.b)
     add('setDongleLedMode', status.finalmouseDongleLedMode)
