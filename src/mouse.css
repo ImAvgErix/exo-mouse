@@ -46,6 +46,15 @@
   --good: #3dd68c;
   --bad: #ff5c5c;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Exo's motion tokens (ui/src/tokens.css): what appears or changes eases out, what travels springs
+     (critically damped at 0.9, never visibly past its place); press, quick, base and move times. */
+  --ease-spring: linear(0, 0.005 1.8%, 0.018 3.7%, 0.04 5.7%, 0.074 8%, 0.111 10.2%, 0.156 12.5%, 0.437 25.8%,
+    0.512 29.7%, 0.576 33.2%, 0.645 37.3%, 0.703 41.3%, 0.756 45.5%, 0.803 49.8%, 0.846 54.5%, 0.883 59.5%,
+    0.913 64.7%, 0.939 70.3%, 0.958 76%, 0.973 82%, 0.986 90.2%, 0.995 99.8%, 1);
+  --dur-press: 90ms;
+  --dur-quick: 120ms;
+  --dur-base: 160ms;
+  --dur-move: 220ms;
   --type-title: calc(20px * var(--exo-scale, 1));
   --type-body: calc(13px * var(--exo-scale, 1));
   --type-small: calc(12px * var(--exo-scale, 1));
@@ -505,7 +514,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: 12px;
   border-radius: 999px;
   background: #fff;
-  transition: transform 200ms var(--ease), background-color 200ms var(--ease);
+  transition: transform var(--dur-move) var(--ease-spring), background-color var(--dur-base) var(--ease);
 }
 
 .m-switch[aria-checked='true'] { background: var(--ink); }
@@ -597,7 +606,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--ink);
   font-size: var(--type-small);
   cursor: pointer;
-  transition: background-color 150ms var(--ease);
+  transition: background-color 150ms var(--ease), scale var(--dur-quick) var(--ease);
 }
 
 .m-select:disabled { cursor: default; opacity: 0.5; }
@@ -632,7 +641,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: var(--bg);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   scrollbar-width: thin;
-  animation: m-fade 120ms var(--ease) both;
+  transform-origin: top center;
+  animation: m-menu-in var(--dur-base) var(--ease) both;
 }
 
 .m-menu-group {
@@ -685,7 +695,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms var(--ease);
+  transition: background-color 120ms var(--ease), box-shadow 120ms var(--ease), opacity 120ms var(--ease), scale var(--dur-quick) var(--ease);
 }
 
 .m-button:disabled { cursor: default; opacity: 0.4; }
@@ -966,10 +976,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
  * passed in as data-exo-motion (host-look.ts), or Windows' when standalone.
  */
 
-/* Arrive: panels rise into place in turn; --i is the panel's place, the 16th on share one delay. */
+/* Arrive: panels rise 8px into place in turn, 24ms apart; --i is the panel's place, the 8th on share one delay. */
 .m-arrive {
-  animation: m-arrive 360ms var(--ease) both;
-  animation-delay: calc(min(var(--i, 0), 15) * 28ms);
+  animation: m-arrive 280ms var(--ease) both;
+  animation-delay: calc(min(var(--i, 0), 7) * 24ms);
 }
 
 /* Switch: a new device or state fades in. */
@@ -983,13 +993,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   overflow: hidden;
 }
 
+/* A layer two and a half times as wide slides across (a transform, so nothing under it repaints). */
 .m-work::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%) no-repeat;
-  background-size: 250% 100%;
-  animation: m-work 1400ms linear infinite;
+  inset: 0 auto 0 0;
+  width: 250%;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%);
+  animation: m-work-band 1400ms linear infinite;
   pointer-events: none;
 }
 
@@ -1070,10 +1081,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-glide.is-glide-ready::before {
   transition:
-    transform 200ms var(--ease),
-    width 200ms var(--ease),
-    height 200ms var(--ease),
-    opacity 120ms var(--ease);
+    transform var(--dur-move) var(--ease-spring),
+    width var(--dur-move) var(--ease-spring),
+    height var(--dur-move) var(--ease-spring),
+    opacity var(--dur-quick) var(--ease);
 }
 
 .m-glide.is-glide-ready [aria-checked='true'] { background-color: transparent; }
@@ -1084,6 +1095,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 @keyframes m-fade { from { opacity: 0; } }
+
+/* A menu settles in from 0.96 under its field, never from nothing. */
+@keyframes m-menu-in { from { opacity: 0; scale: 0.96; } }
+
+@keyframes m-work-band {
+  from { translate: -90% 0; }
+  to { translate: 30% 0; }
+}
 
 @keyframes m-work {
   from { background-position: 150% 0; }
@@ -1121,6 +1140,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition: none;
 }
 
+/* A menu still fades in (opacity alone); a press only darkens. */
+:root[data-exo-motion='reduce'] .m-menu { animation-name: m-fade; }
+:root[data-exo-motion='reduce'] :is(.m-select, .m-button):active:not(:disabled) { scale: none; }
+
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-exo-motion]) :is(.m-arrive, .m-switch-in, .m-picker-scrim, .m-work-text, .m-check, .m-error, .m-done-check),
   :root:not([data-exo-motion]) .m-work::after {
@@ -1135,6 +1158,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   :root:not([data-exo-motion]) .m-glide::before {
     transition: none;
   }
+
+  :root:not([data-exo-motion]) .m-menu { animation-name: m-fade; }
+  :root:not([data-exo-motion]) :is(.m-select, .m-button):active:not(:disabled) { scale: none; }
 }
 
 /* ------------------------------------------------------------- system */
@@ -1174,6 +1200,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 :is(.m-select, .m-button:not(.is-primary)):active:not(:disabled) {
   box-shadow: var(--rim-pressed);
+}
+
+/* A press gives way a little, in fast and back on the quick time, as Exo's controls do. */
+:is(.m-select, .m-button):active:not(:disabled) {
+  scale: 0.97;
+  transition-duration: var(--dur-press);
 }
 
 .m-menu,
