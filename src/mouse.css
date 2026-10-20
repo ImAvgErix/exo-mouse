@@ -1,8 +1,17 @@
 /*
- * Exo's look: void black, cream ink, Inter, hairlines and one pill. Type is
+ * Exo's look: void black, white ink, Inter, hairlines and one pill. Type is
  * 20 / 13 / 12 (times Exo's text size, --exo-scale), 600 only for headings;
  * spacing 4 / 8 / 12 / 16 / 24 / 32; radius 14 for cards, 999 for pills.
  */
+/* Exo's type (ui/src/fonts.css): Inter 4.1's official variable font, with Exo's features. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url("./fonts/InterVariable.woff2") format("woff2");
+}
+
 :root {
   --bg: #000;
   --hair: #1f1f1f;
@@ -27,13 +36,13 @@
   --float: #000;
   /* A hovered control: solid, so nothing shows through it (Exo's --hover-fill). */
   --hover-fill: #1a1a1a;
-  /* A primary (cream) control under the pointer (Exo's --exo-primary-hover). */
-  --primary-hover: #fff;
+  /* A primary (white) control under the pointer steps down a shade (Exo's --exo-primary-hover). */
+  --primary-hover: #e8e8e8;
   /* The off half of a switch and the empty part of a slider (Exo's --exo-track). */
   --track: #2c2c2c;
-  --ink: #f2ede4;
-  --muted: #a29d93;
-  --faint: #78746c;
+  --ink: #ffffff;
+  --muted: #9d9d9d;
+  --faint: #747474;
   --good: #3dd68c;
   --bad: #ff5c5c;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
@@ -54,7 +63,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font: var(--type-body)/1.45 'Inter Variable', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01" 1, "cv05" 1, "ss07" 1;
+  font-optical-sizing: auto;
   overflow: hidden;
 }
 
@@ -148,7 +158,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   margin: 0;
   font-size: var(--type-title);
   font-weight: 600;
-  letter-spacing: -0.015em;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -198,7 +207,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--ink);
   font-size: var(--type-title);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.015em;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -477,7 +485,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .m-seg-item:not(.is-on):not(:disabled):hover { color: var(--ink); }
 }
 
-/* Exo's switch: a dark track, cream when on. */
+/* Exo's switch: a dark track, white when on. */
 .m-switch {
   position: relative;
   display: inline-flex;
@@ -513,7 +521,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-width: 0;
 }
 
-/* Exo's slider, value for value (ui/src/styles/chrome.css): a 4px track filled cream over the track gray, a 14px cream knob. */
+/* Exo's slider, value for value (ui/src/styles/chrome.css): a 4px track filled white over the track gray, a 14px white knob. */
 .m-slider input {
   flex: 1;
   min-width: 0;
@@ -1132,8 +1140,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 /* ------------------------------------------------------------- system */
 
 /* Exo's system, as in Exo's own rooms (ui/src/styles/system.css): panels float as the near-black
-   material with a cream rim, controls are filled capsules with no outline, switches are 40×24
-   with a round cream knob, gray off and green on. */
+   material with a white rim, controls are filled capsules with no outline, switches are 40×24
+   with a round white knob, gray off and green on. */
 .m-panel,
 .m-hero {
   border-color: var(--hair);
@@ -1142,7 +1150,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   box-shadow: none;
 }
 
-/* Controls are Exo's black liquid glass, no outline; fields recessed; primary buttons stay cream. */
+/* Controls are Exo's black liquid glass, no outline; fields recessed; primary buttons stay white. */
 .m-seg,
 .m-select,
 .m-button,

@@ -1,6 +1,5 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import '@fontsource-variable/inter'
 import './mouse.css'
 import { installExoHid } from './exo-hid'
 import { App } from './App'
