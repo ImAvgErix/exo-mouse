@@ -1,8 +1,20 @@
 # Exo Mouse
 
-The mouse settings in Exo Launcher's Devices room: DPI, polling rate, lift-off,
-buttons, lighting, profiles and the rest, for every mouse
+The mouse software in [Exo Launcher](https://github.com/ImAvgErix/ExoLauncher)'s
+Devices room. It talks to your mouse directly over USB, with no vendor app,
+driver or account, for every mouse
 [OpenMouse](https://github.com/OpenMouse-Project)'s protocol library supports.
+
+- **Status:** battery, charging, wireless signal and firmware, and the mouse's
+  name and battery in Exo's top bar.
+- **Settings:** DPI, polling rate, lift-off, buttons, scroll wheel, lighting and
+  more, showing only what your mouse has.
+- **Profiles:** each one linked to games and switched on by itself when one of
+  them starts.
+- **Wired or wireless:** on its cable or its receiver, the same mouse with the
+  same profiles.
+
+## License
 
 Exo Mouse is a separate program from Exo Launcher. It is licensed under the
 GNU Affero General Public License v3.0 or later (see `LICENSE`), because it is
@@ -33,16 +45,11 @@ own; it reaches devices only through a small message protocol with its host:
 `src/exo-hid.ts` turns that into the browser's WebHID interface, so the
 protocol library's drivers run unchanged.
 
-## Fixes to OpenMouse
+## Changes to OpenMouse
 
-`scripts/patch-protocol.mjs` runs before every build and fixes `@openmouse/protocol`
-0.42.2 where Exo Mouse needs it before upstream ships the fix. Today that is
-reading the Finalmouse Starlight X's DPI and polling rate
-([OpenMouse-Project/mouse-protocol#230](https://github.com/OpenMouse-Project/mouse-protocol/pull/230)),
-and its receiver light as Finalmouse's xpanel has it: the TMR-DS mode (4) and
-the custom colour (command 54), which the driver neither offered nor read.
-The script stops the build when the library version changes, so a fixed release
-is noticed and the patch removed.
+`scripts/patch-protocol.mjs` runs before every build and applies fixes to
+`@openmouse/protocol` 0.42.2 until upstream ships them. It stops the build when
+the library version changes, so a fixed release is noticed and its patch removed.
 
 ## Build
 
