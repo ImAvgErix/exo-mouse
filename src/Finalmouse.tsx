@@ -49,6 +49,11 @@ function firmwareAtLeast(status: MouseStatus, version: string): boolean | null {
   return mouse ? !older(mouse, version) : null
 }
 
+/** A Starlight X on its cable (361d:310, 311) keeps the profiles saved for it on its receiver (361d:300, 301). */
+export function finalmouseProfileKey(id: string): string {
+  return id === '361d:310' ? '361d:300' : id === '361d:311' ? '361d:301' : id
+}
+
 /**
  * Why a Starlight X setting shows no value: the mouse did not answer the read (asleep or out of
  * range: it reports its firmware when it does), or its firmware does not report that setting.
@@ -215,14 +220,16 @@ const hex = ({ r, g, b }: Rgb) => `#${[r, g, b].map(v => v.toString(16).padStart
 const rgb = (value: string): [number, number, number] => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16)) as [number, number, number]
 
 /**
- * The receiver's light, Bhop mode and its pass-through window. A value the receiver did not report
- * shows with nothing picked and why, and can still be set.
+ * The receiver's light, Bhop mode and its pass-through window; on the cable there is no receiver,
+ * so Bhop mode alone. A value the mouse did not report shows with nothing picked and why, and can
+ * still be set.
  */
 function Receiver({ status, client, apply, busy }: Section) {
   const color = indicatorColor(status)
   const unread = finalmouseUnread(status)
+  const cabled = status.connectionType === 'Wired'
   const rows = [
-    can(client, 'setDongleLedMode') && (
+    !cabled && can(client, 'setDongleLedMode') && (
       // The custom color sits in the light's own row, beside the pill, while Custom is on.
       <Row key="led" label="Receiver light" value={status.finalmouseDongleLedMode == null ? unread : undefined}>
         <span className="m-inline">
@@ -244,5 +251,5 @@ function Receiver({ status, client, apply, busy }: Section) {
       </Row>
     ),
   ].filter(Boolean)
-  return rows.length ? <Panel title="Receiver">{rows}</Panel> : null
+  return rows.length ? <Panel title={cabled ? 'Scroll wheel' : 'Receiver'}>{rows}</Panel> : null
 }

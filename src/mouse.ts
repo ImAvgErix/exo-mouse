@@ -20,7 +20,7 @@ export type MouseState = {
   current: Candidate | null
   brand: string
   status: MouseStatus | null
-  /** The last change that did not take, in a sentence; with no mouse found, why one that is there can't be reached. */
+  /** The last change that did not take, in a sentence. */
   error: string | null
   busy: boolean
   /** When the mouse last answered a read (ms since epoch); 0 before the first. */
@@ -37,16 +37,8 @@ function invoke(client: SupportedClient, method: string, args: unknown[]): Promi
   return fn.apply(client, args)
 }
 
-/** A Starlight X on its cable (Finalmouse 361d:0310/0311): its settings are reached only through its receiver. */
-const WIRED_SLX = (device: HIDDevice) => device.vendorId === 0x361d && (device.productId === 0x0310 || device.productId === 0x0311)
-
-/** What the room says when no mouse answers: why, for a mouse that is there but can't be reached this way. */
-function noneLine(devices: HIDDevice[]): string | null {
-  return devices.some(WIRED_SLX) ? 'Exo sets the Starlight X through its receiver. Plug the receiver in; the cable can stay.' : null
-}
-
 /** The best interface per physical product: receivers and mice expose several, one of which answers. */
-async function findCandidates(): Promise<{ candidates: Candidate[]; none: string | null }> {
+async function findCandidates(): Promise<Candidate[]> {
   const [devices, drivers] = await Promise.all([exoHid().getDevices(), registry()])
   const best = new Map<string, { device: HIDDevice; score: number }>()
   for (const device of devices) {
@@ -56,10 +48,9 @@ async function findCandidates(): Promise<{ candidates: Candidate[]; none: string
     const known = best.get(id)
     if (!known || score > known.score) best.set(id, { device, score })
   }
-  const candidates = [...best.entries()]
+  return [...best.entries()]
     .sort((a, b) => b[1].score - a[1].score)
     .map(([id, { device }]) => ({ id, device, name: device.productName || 'Mouse' }))
-  return { candidates, none: candidates.length ? null : noneLine(devices) }
 }
 
 const REFRESH_VISIBLE_MS = 4_000
@@ -112,10 +103,11 @@ export function useMouse() {
     chain.current = chain.current.then(async () => {
       if (!live) return
       let candidates: Candidate[]
-      let none: string | null
       try {
-        ({ candidates, none } = await findCandidates())
+        candidates = await findCandidates()
       } catch (e) {
+        // A listing that failed (Exo slow to answer) says nothing about the open mouse: it stays, and the list is asked again.
+        if (client.current?.device.opened) { window.setTimeout(() => setScan(n => n + 1), RETRY_VISIBLE_MS); return }
         if (live) setState(s => ({ ...s, phase: 'error', error: message(e) }))
         return
       }
@@ -128,7 +120,7 @@ export function useMouse() {
         client.current = null
         await old.close().catch(() => undefined)
       }
-      if (!pick) { setState({ phase: 'none', candidates, current: null, brand: '', status: null, error: none, busy: false, readAt: 0 }); return }
+      if (!pick) { setState({ phase: 'none', candidates, current: null, brand: '', status: null, error: null, busy: false, readAt: 0 }); return }
       setState({ phase: 'opening', candidates, current: pick, brand: '', status: null, error: null, busy: false, readAt: 0 })
       const drivers = await registry()
       const next = drivers.createSupportedClient(pick.device)

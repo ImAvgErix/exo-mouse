@@ -11,7 +11,6 @@
     "postinstall": "node scripts/patch-protocol.mjs"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "5.3.0",
     "@openmouse/protocol": "0.42.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

@@ -214,6 +214,9 @@ export class ExoHid {
   readonly #vendorIds: number[]
   /** The first listing is what was already there, not arrivals. */
   #listedOnce = false
+  /** Listings run side by side (every change asks for one): one older than the last applied is stale. */
+  #asked = 0
+  #applied = 0
 
   constructor(vendorIds: number[]) {
     this.#vendorIds = vendorIds
@@ -226,7 +229,11 @@ export class ExoHid {
 
   /** Every present device from a vendor the drivers know; arrivals and departures fire connect and disconnect. */
   async getDevices(): Promise<HIDDevice[]> {
+    const asked = ++this.#asked
     const reply = await call('hid.list', { vendorIds: this.#vendorIds })
+    // Answered after a newer listing: it predates what that one saw, so a device it lacks has not left.
+    if (asked < this.#applied) return [...this.#devices.values()]
+    this.#applied = asked
     const seen = new Set<string>()
     const arrived: ExoHidDevice[] = []
     for (const summary of reply.devices ?? []) {

@@ -1,42 +1,53 @@
 /*
- * Exo's look: void black, cream ink, Inter, hairlines and one pill. Type is
+ * Exo's look: void black, white ink, Inter, hairlines and one pill. Type is
  * 20 / 13 / 12 (times Exo's text size, --exo-scale), 600 only for headings;
  * spacing 4 / 8 / 12 / 16 / 24 / 32; radius 14 for cards, 999 for pills.
  */
+/* Exo's type (ui/src/fonts.css): Inter 4.1's official variable font, with Exo's features. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url("./fonts/InterVariable.woff2") format("woff2");
+}
+
 :root {
   --bg: #000;
   --hair: #1f1f1f;
   --hair-control: #242424;
   --line-soft: #161616;
   --selected: #262626;
-  /* Exo's black liquid glass (ui/src/tokens.css › Controls, value for value): one opaque material for
-     every control, a near-black fill shaded into a wet, rounded surface; fields take it recessed. */
-  --fill: #121212;
-  --rim:
-    inset 0 1px 0 rgb(255 255 255 / 0.14),
-    inset 0 14px 14px -10px rgb(255 255 255 / 0.05),
-    inset 0 -10px 14px -8px rgb(0 0 0 / 0.55),
-    inset 0 -1px 0 rgb(0 0 0 / 0.6);
-  --rim-pressed:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
-    inset 0 8px 12px -6px rgb(0 0 0 / 0.6);
-  --field-rim:
-    inset 0 8px 12px -6px rgb(0 0 0 / 0.75),
-    inset 0 1px 1px rgb(0 0 0 / 0.6),
-    inset 0 -1px 0 rgb(255 255 255 / 0.1);
+  /* Exo's controls (ui/src/tokens.css › Controls): small glass, which over this page's black is black, with one
+     even hairline all around, fields too; no shading that reads as an edge missing. */
+  --fill: #000;
+  --rim: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+  --rim-pressed: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  --field-rim: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+  /* Panels, the hero, menus and pickers are Exo's large glass, and controls its small glass: over this page's
+     black both are black (ui/index.html › exo-glass-panel keeps no floor), never a flat gray; the hairline draws them. */
   --float: #000;
   /* A hovered control: solid, so nothing shows through it (Exo's --hover-fill). */
   --hover-fill: #1a1a1a;
-  /* A primary (cream) control under the pointer (Exo's --exo-primary-hover). */
-  --primary-hover: #fff;
+  /* A primary (white) control under the pointer steps down a shade (Exo's --exo-primary-hover). */
+  --primary-hover: #e8e8e8;
   /* The off half of a switch and the empty part of a slider (Exo's --exo-track). */
   --track: #2c2c2c;
-  --ink: #f2ede4;
-  --muted: #a29d93;
-  --faint: #78746c;
+  --ink: #ffffff;
+  --muted: #9d9d9d;
+  --faint: #747474;
   --good: #3dd68c;
   --bad: #ff5c5c;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Exo's motion tokens (ui/src/tokens.css): what appears or changes eases out, what travels springs
+     (critically damped at 0.9, never visibly past its place); press, quick, base and move times. */
+  --ease-spring: linear(0, 0.005 1.8%, 0.018 3.7%, 0.04 5.7%, 0.074 8%, 0.111 10.2%, 0.156 12.5%, 0.437 25.8%,
+    0.512 29.7%, 0.576 33.2%, 0.645 37.3%, 0.703 41.3%, 0.756 45.5%, 0.803 49.8%, 0.846 54.5%, 0.883 59.5%,
+    0.913 64.7%, 0.939 70.3%, 0.958 76%, 0.973 82%, 0.986 90.2%, 0.995 99.8%, 1);
+  --dur-press: 90ms;
+  --dur-quick: 120ms;
+  --dur-base: 160ms;
+  --dur-move: 220ms;
   --type-title: calc(20px * var(--exo-scale, 1));
   --type-body: calc(13px * var(--exo-scale, 1));
   --type-small: calc(12px * var(--exo-scale, 1));
@@ -54,7 +65,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font: var(--type-body)/1.45 'Inter Variable', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01" 1, "cv05" 1, "ss07" 1;
+  font-optical-sizing: auto;
   overflow: hidden;
 }
 
@@ -148,7 +160,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   margin: 0;
   font-size: var(--type-title);
   font-weight: 600;
-  letter-spacing: -0.015em;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -198,7 +209,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--ink);
   font-size: var(--type-title);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.015em;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -343,7 +353,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 16px 24px 4px;
   border: 1px solid var(--hair);
   border-radius: 14px;
-  background: var(--bg);
+  background: var(--float);
 }
 
 .m-grid.is-measuring > .m-panel { flex: 0 0 auto; }
@@ -477,7 +487,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .m-seg-item:not(.is-on):not(:disabled):hover { color: var(--ink); }
 }
 
-/* Exo's switch: a dark track, cream when on. */
+/* Exo's switch: a dark track, white when on. */
 .m-switch {
   position: relative;
   display: inline-flex;
@@ -497,7 +507,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: 12px;
   border-radius: 999px;
   background: #fff;
-  transition: transform 200ms var(--ease), background-color 200ms var(--ease);
+  transition: transform var(--dur-move) var(--ease-spring), background-color var(--dur-base) var(--ease);
 }
 
 .m-switch[aria-checked='true'] { background: var(--ink); }
@@ -513,7 +523,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-width: 0;
 }
 
-/* Exo's slider, value for value (ui/src/styles/chrome.css): a 4px track filled cream over the track gray, a 14px cream knob. */
+/* Exo's slider, value for value (ui/src/styles/chrome.css): a 4px track filled white over the track gray, a 14px white knob. */
 .m-slider input {
   flex: 1;
   min-width: 0;
@@ -589,7 +599,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--ink);
   font-size: var(--type-small);
   cursor: pointer;
-  transition: background-color 150ms var(--ease);
+  transition: background-color 150ms var(--ease), scale var(--dur-quick) var(--ease);
 }
 
 .m-select:disabled { cursor: default; opacity: 0.5; }
@@ -603,7 +613,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: 12px;
   fill: none;
   stroke: var(--muted);
-  stroke-width: 1.5;
+  /* Tabler's chevron at Exo's line (ui/src/brand/icons.tsx), as Exo's menus draw it. */
+  stroke-width: 1.875;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: transform 150ms var(--ease);
@@ -624,7 +635,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: var(--bg);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   scrollbar-width: thin;
-  animation: m-fade 120ms var(--ease) both;
+  transform-origin: top center;
+  animation: m-menu-in var(--dur-base) var(--ease) both;
 }
 
 .m-menu-group {
@@ -677,7 +689,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms var(--ease);
+  transition: background-color 120ms var(--ease), box-shadow 120ms var(--ease), opacity 120ms var(--ease), scale var(--dur-quick) var(--ease);
 }
 
 .m-button:disabled { cursor: default; opacity: 0.4; }
@@ -958,10 +970,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
  * passed in as data-exo-motion (host-look.ts), or Windows' when standalone.
  */
 
-/* Arrive: panels rise into place in turn; --i is the panel's place, the 16th on share one delay. */
+/* Arrive: panels rise 8px into place in turn, 24ms apart; --i is the panel's place, the 8th on share one delay. */
 .m-arrive {
-  animation: m-arrive 360ms var(--ease) both;
-  animation-delay: calc(min(var(--i, 0), 15) * 28ms);
+  animation: m-arrive 280ms var(--ease) both;
+  animation-delay: calc(min(var(--i, 0), 7) * 24ms);
 }
 
 /* Switch: a new device or state fades in. */
@@ -975,13 +987,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   overflow: hidden;
 }
 
+/* A layer two and a half times as wide slides across (a transform, so nothing under it repaints). */
 .m-work::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%) no-repeat;
-  background-size: 250% 100%;
-  animation: m-work 1400ms linear infinite;
+  inset: 0 auto 0 0;
+  width: 250%;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%);
+  animation: m-work-band 1400ms linear infinite;
   pointer-events: none;
 }
 
@@ -1001,11 +1014,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: 12px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.4;
+  /* Tabler's check at Exo's line (ui/src/brand/icons.tsx), drawn in. */
+  stroke-width: 1.875;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 24;
-  stroke-dashoffset: 24;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   animation: m-check 380ms var(--ease) 80ms forwards;
 }
 
@@ -1031,11 +1045,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   aspect-ratio: 1;
   fill: none;
   stroke: var(--good);
-  stroke-width: 2.4;
+  stroke-width: 1.875;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 24;
-  stroke-dashoffset: 24;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   animation: m-done-check 3000ms var(--ease) forwards;
 }
 
@@ -1062,10 +1076,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-glide.is-glide-ready::before {
   transition:
-    transform 200ms var(--ease),
-    width 200ms var(--ease),
-    height 200ms var(--ease),
-    opacity 120ms var(--ease);
+    transform var(--dur-move) var(--ease-spring),
+    width var(--dur-move) var(--ease-spring),
+    height var(--dur-move) var(--ease-spring),
+    opacity var(--dur-quick) var(--ease);
 }
 
 .m-glide.is-glide-ready [aria-checked='true'] { background-color: transparent; }
@@ -1076,6 +1090,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 @keyframes m-fade { from { opacity: 0; } }
+
+/* A menu settles in from 0.96 under its field, never from nothing. */
+@keyframes m-menu-in { from { opacity: 0; scale: 0.96; } }
+
+@keyframes m-work-band {
+  from { translate: -90% 0; }
+  to { translate: 30% 0; }
+}
 
 @keyframes m-work {
   from { background-position: 150% 0; }
@@ -1092,7 +1114,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 @keyframes m-done-check {
-  0%, 3% { stroke-dashoffset: 24; opacity: 1; }
+  0%, 3% { stroke-dashoffset: 1; opacity: 1; }
   15% { stroke-dashoffset: 0; opacity: 1; }
   80% { stroke-dashoffset: 0; opacity: 1; }
   100% { stroke-dashoffset: 0; opacity: 0; }
@@ -1113,6 +1135,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition: none;
 }
 
+/* A menu still fades in (opacity alone); a press only darkens. */
+:root[data-exo-motion='reduce'] .m-menu { animation-name: m-fade; }
+:root[data-exo-motion='reduce'] :is(.m-select, .m-button):active:not(:disabled) { scale: none; }
+
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-exo-motion]) :is(.m-arrive, .m-switch-in, .m-picker-scrim, .m-work-text, .m-check, .m-error, .m-done-check),
   :root:not([data-exo-motion]) .m-work::after {
@@ -1127,13 +1153,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   :root:not([data-exo-motion]) .m-glide::before {
     transition: none;
   }
+
+  :root:not([data-exo-motion]) .m-menu { animation-name: m-fade; }
+  :root:not([data-exo-motion]) :is(.m-select, .m-button):active:not(:disabled) { scale: none; }
 }
 
 /* ------------------------------------------------------------- system */
 
 /* Exo's system, as in Exo's own rooms (ui/src/styles/system.css): panels float as the near-black
-   material with a cream rim, controls are filled capsules with no outline, switches are 40×24
-   with a round cream knob, gray off and green on. */
+   material with a white rim, controls are filled capsules with no outline, switches are 40×24
+   with a round white knob, gray off and green on. */
 .m-panel,
 .m-hero {
   border-color: var(--hair);
@@ -1142,7 +1171,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   box-shadow: none;
 }
 
-/* Controls are Exo's black liquid glass, no outline; fields recessed; primary buttons stay cream. */
+/* Controls are flat: the near-black fill and one even hairline, no outline ring, fields the same; primary buttons stay white. */
 .m-seg,
 .m-select,
 .m-button,
@@ -1166,6 +1195,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 :is(.m-select, .m-button:not(.is-primary)):active:not(:disabled) {
   box-shadow: var(--rim-pressed);
+}
+
+/* A press gives way a little, in fast and back on the quick time, as Exo's controls do. */
+:is(.m-select, .m-button):active:not(:disabled) {
+  scale: 0.97;
+  transition-duration: var(--dur-press);
 }
 
 .m-menu,
@@ -1218,6 +1253,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   margin-left: auto;
   padding-left: 16px;
   background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") right center / 14px no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") right center / 14px no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5l10 -10'/%3E%3C/svg%3E") right center / 14px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5l10 -10'/%3E%3C/svg%3E") right center / 14px no-repeat;
 }

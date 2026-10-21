@@ -23,6 +23,12 @@ const files = {
       '            if (payload.length < 8)\n                return null;\n            const thrR',
       '            if (payload.length < 4)\n                return null;\n            const thrR',
     ],
+    // A receiver whose mouse has not linked yet (just back from its cable) answers battery 255:
+    // not known, so the last reading stays instead of "255 %".
+    [
+      '        case 38: {\n            if (payload.length < 3)\n                return null;',
+      '        case 38: {\n            if (payload.length < 3 || payload[0] > 100)\n                return null;',
+    ],
     [
       '            return thrR === null || thrL === null || hystR === null || hystL === null\n                ? null\n                : { tmrThrR: thrR, tmrThrL: thrL, tmrHystR: hystR, tmrHystL: hystL };',
       '            return thrR === null || thrL === null\n                ? null\n                : { tmrThrR: thrR, tmrThrL: thrL, ...(hystR === null || hystL === null ? {} : { tmrHystR: hystR, tmrHystL: hystL }) };',
@@ -50,6 +56,30 @@ const files = {
       '        await this.write(this.txReport, FINALMOUSE_COMMAND.indicatorColor, encodeFinalmouseIndicatorColor(r, g, b));\n    }',
       '        await this.write(this.txReport, FINALMOUSE_COMMAND.indicatorColor, encodeFinalmouseIndicatorColor(r, g, b));\n        this.telemetry.indicatorColor = { r, g, b };\n    }',
     ],
+    // A Starlight X on its cable (361d:0310/0311) speaks the receiver's protocol on the same vendor
+    // page and report IDs (xpanel's transport treats slx_mouse and slx_dongle alike), but the driver
+    // took only receivers. On the cable it says so, and has no receiver signal.
+    [
+      'FINALMOUSE_SLX_DONGLE_PRODUCT_IDS, FINALMOUSE_VENDOR_ID as PROTOCOL_VENDOR_ID',
+      'FINALMOUSE_SLX_DONGLE_PRODUCT_IDS, FINALMOUSE_SLX_MOUSE_PRODUCT_IDS, FINALMOUSE_VENDOR_ID as PROTOCOL_VENDOR_ID',
+    ],
+    [
+      '        return FINALMOUSE_SLX_DONGLE_PRODUCT_IDS.includes(device.productId)\n            && device.collections',
+      '        return [...FINALMOUSE_SLX_DONGLE_PRODUCT_IDS, ...FINALMOUSE_SLX_MOUSE_PRODUCT_IDS].includes(device.productId)\n            && device.collections',
+    ],
+    [
+      '        return FINALMOUSE_SLX_DONGLE_PRODUCT_IDS.includes(this.device.productId);',
+      '        return [...FINALMOUSE_SLX_DONGLE_PRODUCT_IDS, ...FINALMOUSE_SLX_MOUSE_PRODUCT_IDS].includes(this.device.productId);',
+    ],
+    [
+      '        const connectionDetail = [\n            "2.4 GHz receiver",',
+      '        const cabled = FINALMOUSE_SLX_MOUSE_PRODUCT_IDS.includes(this.device.productId);\n        const connectionDetail = cabled ? "Cable" : [\n            "2.4 GHz receiver",',
+    ],
+    ['            connectionType: "Wireless",', '            connectionType: cabled ? "Wired" : "Wireless",'],
+    [
+      '            signalStrength: finalmouseSignalStrength(state.rssiDbm, state.linkState),',
+      '            signalStrength: cabled ? null : finalmouseSignalStrength(state.rssiDbm, state.linkState),',
+    ],
     // A Starlight X that did not answer was called an UltralightX.
     [
       '            throw new Error("The Finalmouse UltralightX did not return its current settings.',
@@ -58,6 +88,13 @@ const files = {
     [
       ' Make sure the mouse is on and close xpanel or other Finalmouse software.");',
       ' Make sure the mouse is on and close xpanel or other Finalmouse software.`);',
+    ],
+  ],
+  // With the receiver in too, the cabled Starlight X is the one picked: it reaches the mouse directly.
+  'dist/drivers/registry.js': [
+    [
+      'create: (device) => new FinalmouseHidClient(device), score: () => 10 },',
+      'create: (device) => new FinalmouseHidClient(device), score: (device) => (device.productId === 0x0310 || device.productId === 0x0311 ? 11 : 10) },',
     ],
   ],
 }

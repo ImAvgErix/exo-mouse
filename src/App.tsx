@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, useMouse } from './mouse'
 import type { Section } from './section'
-import { FinalmousePanels, finalmouseCustomLod, finalmouseUnread } from './Finalmouse'
+import { FinalmousePanels, finalmouseCustomLod, finalmouseProfileKey, finalmouseUnread } from './Finalmouse'
 import { AtkMiscPanels } from './brands/atk-misc'
 import { CoreExtrasPanels, coreExtrasReplaces } from './brands/core-extras'
 import { EndgamePulsarPanels } from './brands/endgame-pulsar'
@@ -59,7 +59,7 @@ export function Room({ mouse }: { mouse: ReturnType<typeof useMouse> }) {
         <Buttons {...section} />
         <Lighting {...section} />
         <Power {...section} />
-        {mouse.current ? <Profiles device={mouse.current.id} status={mouse.status} client={mouse.client} applyAll={mouse.applyAll} busy={mouse.busy} /> : null}
+        {mouse.current ? <Profiles device={finalmouseProfileKey(mouse.current.id)} status={mouse.status} client={mouse.client} applyAll={mouse.applyAll} busy={mouse.busy} /> : null}
       </Settings>
     </main>
   )
@@ -190,7 +190,7 @@ function Device({ status, brand, readAt, busy, error, children }: { status: Mous
         ) : <span className="m-hero-image is-empty" />}
         {landed ? (
           <span key={landed} className="m-done" aria-hidden="true">
-            <svg className="m-done-check" viewBox="0 0 24 24"><path d="M6 12.5 l4 4 l8 -9" /></svg>
+            <svg className="m-done-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10" pathLength="1" /></svg>
           </span>
         ) : null}
         {error ? <p className="m-error" role="alert">{error}</p> : null}

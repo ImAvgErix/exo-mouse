@@ -324,7 +324,7 @@ export function Profiles({ device, status, client, applyAll, busy }: {
                 {p.name}
                 {active(p) ? (
                   <span className="m-row-value is-good m-switch-in">
-                    {applied === p.id ? <svg className="m-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : null}
+                    {applied === p.id ? <svg className="m-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5l10 -10" pathLength="1" /></svg> : null}
                     Active
                   </span>
                 ) : null}
