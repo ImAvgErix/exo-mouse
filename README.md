@@ -61,7 +61,7 @@ the library version changes, so a fixed release is noticed and its patch removed
 
 ## Build
 
-```
+```sh
 npm ci
 npm run build
 ```
