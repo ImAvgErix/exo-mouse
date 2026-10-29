@@ -5,7 +5,11 @@ import {
   BUNNY_HOP_LIMITS,
   LOGITECH_BUTTON_ACTIONS,
   capabilitiesForFormat,
+  reportRateCapabilitiesFor,
+  reportRatesForDevice,
   type LogitechButtonAction,
+  type LogitechButtonBinding,
+  type OnboardButtonAssignment,
   type OnboardProfile,
 } from '@openmouse/protocol/drivers/logitech/onboard-profiles'
 import {
@@ -18,7 +22,7 @@ import {
 } from '@openmouse/protocol/logitech'
 import { can } from '../mouse'
 import type { Section } from '../section'
-import { Confirm, Dropdown, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
+import { Dropdown, NumberField, Panel, Row, Segmented, Slider, Switch, useAsk, type DropOption } from '../ui'
 import './logitech.css'
 
 /**
@@ -46,13 +50,29 @@ export function LogitechPanels(section: Section) {
 
 const isLogitech = (status: MouseStatus) => status.ui?.family === 'logitech-hidpp'
 
+/**
+ * The polling rates each connection takes, for a Logitech mouse whose profile format keeps one rate per connection
+ * (format 6 on): the one it is on as it reports them, the other as the format allows. Null for any other mouse, whose
+ * other connection can't be known until it is on it.
+ */
+export function linkRates(status: MouseStatus): Record<'Wireless' | 'Wired', number[]> | null {
+  const format = status.onboardProfileFormat
+  if (!isLogitech(status) || !format || format.id < 6 || !status.connectionType || status.ui?.pollingReadOnly) return null
+  const caps = reportRateCapabilitiesFor(format.id, status.transportIds?.USB)
+  const on = status.connectionType === 'Wireless' ? 'wireless' : 'wired'
+  const live = status.supportedPollingRates ?? []
+  const Wireless = reportRatesForDevice(caps, 'wireless', live, on, false)
+  const Wired = reportRatesForDevice(caps, 'wired', live, on, false)
+  return Wireless.length && Wired.length ? { Wireless, Wired } : null
+}
+
 // ------------------------------------------------------------------ local controls
 
 
 /** A long list with values that are not strings. */
 function Choose<T extends string | number>({ label, options, value, onChange, disabled = false, describe }: {
   label: string
-  options: readonly { value: T; label: string }[]
+  options: readonly DropOption<T>[]
   value: T | null | undefined
   onChange: (value: T) => void
   disabled?: boolean
@@ -278,7 +298,32 @@ const BUTTON_SLOTS = [
   { button: 3, label: 'Back', locked: false },
 ] as const
 const LAYERS = [{ value: 'primary', label: 'Standard' }, { value: 'g-shift', label: 'G-Shift' }] as const
-const ACTION_OPTIONS = LOGITECH_BUTTON_ACTIONS.map(a => ({ value: a as LogitechButtonAction | 'Custom', label: a }))
+
+/**
+ * Keys a button sends by itself from the profile, by HID usage: F1 to F24 (F13 to F24 are on no keyboard, so a button
+ * is the way to press them, for push-to-talk) and the keys around them.
+ */
+const KEYS: readonly (readonly [string, number])[] = [
+  ...Array.from({ length: 24 }, (_, i) => [`F${i + 1}`, i < 12 ? 0x3a + i : 0x68 + i - 12] as const),
+  ['Enter', 0x28], ['Escape', 0x29], ['Backspace', 0x2a], ['Tab', 0x2b], ['Space', 0x2c], ['Print screen', 0x46],
+  ['Scroll lock', 0x47], ['Pause', 0x48], ['Insert', 0x49], ['Home', 0x4a], ['Page up', 0x4b], ['Delete', 0x4c],
+  ['End', 0x4d], ['Page down', 0x4e], ['Right arrow', 0x4f], ['Left arrow', 0x50], ['Down arrow', 0x51], ['Up arrow', 0x52],
+]
+/** The mouse's own actions, then Keys; a key is `key:<usage>`. */
+const ASSIGN_OPTIONS: DropOption<string>[] = [
+  ...LOGITECH_BUTTON_ACTIONS.map(a => ({ value: a as string, label: a })),
+  ...KEYS.map(([label, usage]) => ({ value: `key:${usage}`, label, group: 'Keys' })),
+]
+
+/** What a button does as the menu has it: an action, a bare key from Keys, else Custom (a shortcut, a macro, media). */
+function assigned(a: OnboardButtonAssignment): string {
+  if (a.action !== 'Custom') return a.action
+  const [kind, type, modifiers, usage] = a.raw
+  return kind === 0x80 && type === 0x02 && modifiers === 0 && KEYS.some(([, k]) => k === usage) ? `key:${usage}` : 'Custom'
+}
+
+const binding = (value: string): LogitechButtonAction | LogitechButtonBinding =>
+  value.startsWith('key:') ? { kind: 'keyboard', key: Number(value.slice(4)), modifiers: 0 } : value as LogitechButtonAction
 
 function profileName(p: OnboardProfile): string {
   return p.name?.trim() || `Profile ${p.sector}`
@@ -308,7 +353,13 @@ function OnboardMemory({ status, client, apply, applyAll, busy }: Section) {
     if (took) reload()
   }
 
-  const bunny = current && format && capabilitiesForFormat(format.id).bunnyHop ? current.bunnyHoppingMs ?? 0 : null
+  // Bunny hop: the running onboard profile's, or while the mouse runs from this PC, Host mode's, which the mouse
+  // can't report (mouse.ts fills in what Exo last wrote; the library's write follows G HUB's).
+  const bunny = onboard
+    ? current && format && capabilitiesForFormat(format.id).bunnyHop ? current.bunnyHoppingMs ?? 0 : null
+    : status.hostBunnyHopMs ?? null
+  const bunnyWritable = onboard ? writable : can(client, 'setHostBunnyHopMs')
+  const setBunny = (ms: number) => void (onboard ? writeProfile({ bunnyHoppingMs: ms }) : apply('setHostBunnyHopMs', ms))
   const buttonMap = current && writable && BUTTON_LAYOUTS.has(status.name.replace(/\s+/g, '').toUpperCase())
   const assignments = current ? (layer === 'primary' ? current.buttonAssignments : current.gShiftAssignments) : []
 
@@ -336,15 +387,19 @@ function OnboardMemory({ status, client, apply, applyAll, busy }: Section) {
         </Row>
       )
     ),
+    // A mouse G HUB never linked keeps no onboard profiles; it says so rather than leaving the panel without one.
+    onboard && profiles != null && selectable.length === 0 && (
+      <Row key="profile" label="Profile"><span className="m-state">None stored</span></Row>
+    ),
     bunny != null && (
-      writable ? (
-        <Row key="bunny" label="BHOP mode" value={bunny ? undefined : 'Off'}>
+      bunnyWritable ? (
+        <Row key="bunny" label="BHOP mode">
           <span className="lg-pair">
             {bunny ? (
               <NumberField label="BHOP mode" min={BUNNY_HOP_LIMITS.minMs} max={BUNNY_HOP_LIMITS.maxMs} step={BUNNY_HOP_LIMITS.stepMs}
-                value={bunny} suffix="ms" onCommit={v => void writeProfile({ bunnyHoppingMs: v })} disabled={busy} />
+                value={bunny} suffix="ms" onCommit={setBunny} disabled={busy} />
             ) : null}
-            <Switch label="BHOP mode" checked={bunny !== 0} onChange={on => void writeProfile({ bunnyHoppingMs: on ? BUNNY_HOP_LIMITS.minMs : 0 })} disabled={busy} />
+            <Switch label="BHOP mode" checked={bunny !== 0} onChange={on => setBunny(on ? BUNNY_HOP_LIMITS.minMs : 0)} disabled={busy} />
           </span>
         </Row>
       ) : (
@@ -365,18 +420,16 @@ function OnboardMemory({ status, client, apply, applyAll, busy }: Section) {
           </Row>
           {BUTTON_SLOTS.map(slot => {
             const assignment = assignments.find(a => a.button === slot.button)
-            const action = assignment?.action ?? null
+            const value = assignment ? assigned(assignment) : null
             const locked = slot.locked && layer === 'primary'
             return (
               <Row key={slot.button} label={slot.label}>
-                {locked || !assignment ? (
-                  <span className="m-state">{action ?? 'Unknown'}</span>
+                {locked || value == null ? (
+                  <span className="m-state">{ASSIGN_OPTIONS.find(o => o.value === value)?.label ?? value ?? 'Unknown'}</span>
                 ) : (
-                  <Choose label={slot.label} options={ACTION_OPTIONS} value={action}
-                    onChange={next => {
-                      if (next === 'Custom') return
-                      void writeProfile({ buttonAssignments: [{ layer, button: slot.button, binding: next }] })
-                    }} disabled={busy} />
+                  <Choose label={slot.label} options={ASSIGN_OPTIONS} value={value}
+                    onChange={next => void writeProfile({ buttonAssignments: [{ layer, button: slot.button, binding: binding(next) }] })}
+                    disabled={busy} />
                 )}
               </Row>
             )
@@ -461,11 +514,27 @@ function EasySwitch({ status, apply, busy }: Section) {
         disabled={busy}
       />
       {pending !== null ? (
-        <Confirm title={`Switch to computer ${pending + 1}?`} action="Switch"
-          body={`Your mouse moves to computer ${pending + 1} and stops working here until you switch it back with its Easy-Switch button.`}
-          onConfirm={() => { setPending(null); void apply('requestHostSwitch', pending) }} onClose={() => setPending(null)} />
+        <SwitchAsk key={pending} slot={pending} onConfirm={() => { setPending(null); void apply('requestHostSwitch', pending) }} onBack={() => setPending(null)} />
       ) : null}
     </Row>
+  )
+}
+
+/**
+ * Easy-Switch moves the mouse to another computer, where it stops working here until its own button brings it back, so
+ * the choice asks beside itself, armed as it appears: a second press (or Enter) switches; Escape, a press elsewhere or
+ * 4 s keep this computer.
+ */
+function SwitchAsk({ slot, onConfirm, onBack }: { slot: number; onConfirm: () => void; onBack: () => void }) {
+  const ask = useAsk(onConfirm)
+  const arm = useRef(ask.arm)
+  const was = useRef(false)
+  useEffect(() => arm.current(), [])
+  useEffect(() => { if (was.current && !ask.armed) onBack(); was.current = ask.armed }, [ask.armed, onBack])
+  return (
+    <button ref={ask.ref} type="button" className={`m-button is-compact m-ask${ask.armed ? ' is-armed' : ''}`} onClick={ask.press}>
+      {ask.words(`Switch to ${slot + 1}?`, 'Switch')}
+    </button>
   )
 }
 

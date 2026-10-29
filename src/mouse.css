@@ -12,36 +12,52 @@
   src: url("./fonts/InterVariable.woff2") format("woff2");
 }
 
+/* Exo's Liquid Glass (DESIGN.md › Glass), as Exo draws it in each Appearance. In Exo, Exo sends its own values for
+   every look token below (host-look.ts), read off its own surfaces, and they replace these; these are the same
+   material for Exo Mouse on its own. One thin even line round every glass, no lit top, shaded foot or glow inside. */
 :root {
   --bg: #000;
-  --hair: #1f1f1f;
-  --hair-control: #242424;
-  --line-soft: #161616;
-  --selected: #262626;
-  /* Exo's controls (ui/src/tokens.css › Controls): Void's raised fill (white at 8% on black) under one even
-     hairline, fields too; no shading that reads as an edge missing. */
-  --fill: #141414;
-  /* Exo's liquid glass edge (Exo's tokens.css, --glassy-ring and --glassy-rim): a bright top line, a fainter bottom one,
-     an even hairline and a soft glow just inside, on every control and panel. Menus are Exo's clear frost (--glass). */
-  --edge: inset 0 1px 0 rgb(255 255 255 / 0.55), inset 0 -1px 0 rgb(255 255 255 / 0.12), inset 0 0 0 1px rgb(255 255 255 / 0.14), inset 0 0 18px rgb(255 255 255 / 0.06);
-  --glass: blur(12px) saturate(1.8) brightness(0.66);
-  --glass-tint: rgb(0 0 0 / 0.36);
-  --rim: var(--edge);
-  --rim-pressed: inset 0 0 0 1px rgb(255 255 255 / 0.08), inset 0 0 18px rgb(255 255 255 / 0.06);
-  --field-rim: inset 0 0 0 1px rgb(255 255 255 / 0.09);
-  /* Panels, the hero, menus and pickers are black like Exo's Void panes, set apart by their hairline. */
-  --float: #000;
-  /* A hovered control: solid, so nothing shows through it (Exo's --hover-fill). */
-  --hover-fill: #1f1f1f;
-  /* A primary (white) control under the pointer steps down a shade (Exo's --exo-primary-hover). */
-  --primary-hover: #e8e8e8;
-  /* The off half of a switch and the empty part of a slider (Exo's --exo-track). */
-  --track: #2c2c2c;
   --ink: #ffffff;
   --muted: #9d9d9d;
   --faint: #757575;
   --good: #3dd68c;
   --bad: #ff5c5c;
+  /* What sits on the ink (a primary control's words), and the ink a shade down under the pointer. */
+  --primary-ink: #000;
+  --primary-hover: #e8e8e8;
+  /* The off half of a switch and the empty part of a slider. */
+  --track: rgb(255 255 255 / 0.17);
+  /* A hairline on the page (the hero's readout), and inside a pane (its rows). */
+  --hair: #1f1f1f;
+  --line-soft: rgb(255 255 255 / 0.1);
+  /* A ring that is the control itself (a gauge's track, a color well). */
+  --hair-control: #242424;
+  /* Lifts of the glass: under the pointer, pressed, the current choice. */
+  --hover-fill: rgb(255 255 255 / 0.1);
+  --pressed: rgb(255 255 255 / 0.133);
+  --selected: rgb(255 255 255 / 0.15);
+  /* A pane (every panel): clear glass in a layer under its content, so what is on it is glass too. */
+  --pane-fill: transparent;
+  --pane-glass: blur(10px) brightness(0.62) saturate(1.8);
+  --pane-edge: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  /* Small glass (every control): clear over its own blur and tone, inside the same one line; a field the same. */
+  --fill: transparent;
+  --control-glass: blur(10px) brightness(0.62) saturate(1.8);
+  --rim: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  --rim-pressed: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  --field-rim: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  /* Large glass (menus, the games sheet, dialogs): a thicker frost floating in an even halo, its own words and lifts. */
+  --panel-fill: rgb(0 0 0 / 0.36);
+  --panel-glass: blur(20px) saturate(1.8) brightness(0.66);
+  --panel-edge: inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 0 40px rgb(0 0 0 / 0.5);
+  --panel-ink: #ffffff;
+  --panel-muted: #dcdcdc;
+  --panel-hover: rgb(255 255 255 / 0.07);
+  --panel-selected: rgb(255 255 255 / 0.1);
+  --panel-pressed: rgb(255 255 255 / 0.14);
+  /* The hero: the page with one hairline, as Exo's device pages' heroes. */
+  --hero-fill: #000;
+  --hero-edge: inset 0 0 0 1px #1f1f1f;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
   /* Exo's motion tokens (ui/src/tokens.css): what appears or changes eases out, what travels springs
      (critically damped at 0.9, never visibly past its place); press, quick, base and move times. */
@@ -58,49 +74,76 @@
   color-scheme: dark;
 }
 
-/* Exo's Appearance (ui/src/tokens.css): Void is the page above; Dark is charcoal, Light a soft neutral. */
+/* Exo's Appearance (DESIGN.md › Tokens): Void is the page above; Dark is charcoal, Light a soft neutral under a white
+   frost with a dark hairline. Each sets its own glass, so nothing of Void's reaches it. */
 :root[data-exo-theme="dark"] {
   --bg: #121212;
-  --hair: #2c2c2c;
-  --hair-control: #3a3a3a;
-  --line-soft: #2e2e2e;
-  --selected: #353535;
-  --fill: #2c2c2c;
-  --float: #252525;
-  --hover-fill: #333333;
-  --primary-hover: #cfcfcf;
-  --track: #2c2c2c;
   --ink: #e0e0e0;
   --muted: #b0b0b0;
   --faint: #8f8f8f;
-  --glass-tint: rgb(44 44 46 / 0.42);
-  --rim: var(--edge);
-  --rim-pressed: inset 0 0 0 1px rgb(255 255 255 / 0.08), inset 0 0 18px rgb(255 255 255 / 0.06);
-  --field-rim: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  --primary-ink: #121212;
+  --primary-hover: #cfcfcf;
+  --track: rgb(255 255 255 / 0.17);
+  --hair: #2c2c2c;
+  --line-soft: rgb(224 224 224 / 0.1);
+  --hair-control: #3a3a3a;
+  --hover-fill: rgb(255 255 255 / 0.1);
+  --pressed: rgb(255 255 255 / 0.133);
+  --selected: rgb(255 255 255 / 0.15);
+  --pane-fill: transparent;
+  --pane-glass: blur(10px) brightness(0.62) contrast(0.9) saturate(1.8);
+  --pane-edge: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  --fill: transparent;
+  --control-glass: blur(10px) brightness(0.62) contrast(0.9) saturate(1.8);
+  --rim: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  --rim-pressed: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  --field-rim: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  --panel-fill: rgb(44 44 46 / 0.42);
+  --panel-glass: blur(20px) saturate(1.8) brightness(0.64);
+  --panel-edge: inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 0 40px rgb(0 0 0 / 0.5);
+  --panel-ink: #f0f0f0;
+  --panel-muted: #c8c8c8;
+  --panel-hover: rgb(224 224 224 / 0.07);
+  --panel-selected: rgb(224 224 224 / 0.1);
+  --panel-pressed: rgb(224 224 224 / 0.14);
+  --hero-fill: #121212;
+  --hero-edge: inset 0 0 0 1px #2c2c2c;
 }
 
 :root[data-exo-theme="light"] {
   --bg: #f5f5f5;
-  --hair: #e0e0e0;
-  --hair-control: #e0e0e0;
-  --line-soft: #eaeaea;
-  --selected: #e8e8e8;
-  --fill: #ffffff;
-  --float: #ffffff;
-  --hover-fill: #ebebeb;
-  --primary-hover: #3a3a3a;
-  --track: rgb(118 118 128 / 0.2);
   --ink: #1e1e1e;
   --muted: #555555;
   --faint: #666666;
-  --good: #0f6b3a;
-  --bad: #d12f2f;
-  --edge: inset 0 0 0 1px rgb(0 0 0 / 0.11), inset 0 1px 0 rgb(255 255 255 / 0.9), inset 0 -1px 0 rgb(255 255 255 / 0.4), inset 0 0 18px rgb(255 255 255 / 0.3);
-  --glass: blur(12px) saturate(1.6) brightness(1.06);
-  --glass-tint: rgb(255 255 255 / 0.74);
-  --rim: var(--edge);
-  --rim-pressed: inset 0 0 0 1px rgb(0 0 0 / 0.08), inset 0 0 18px rgb(255 255 255 / 0.3);
-  --field-rim: inset 0 1px 2px rgb(0 0 0 / 0.08), inset 0 0 0 1px rgb(0 0 0 / 0.1);
+  --good: #0a5830;
+  --bad: #c42020;
+  --primary-ink: #ffffff;
+  --primary-hover: #3a3a3a;
+  --track: rgb(118 118 128 / 0.2);
+  --hair: #e0e0e0;
+  --line-soft: rgb(30 30 30 / 0.1);
+  --hair-control: #e0e0e0;
+  --hover-fill: rgb(0 0 0 / 0.05);
+  --pressed: rgb(0 0 0 / 0.09);
+  --selected: rgb(0 0 0 / 0.07);
+  --pane-fill: rgb(255 255 255 / 0.55);
+  --pane-glass: blur(10px) brightness(1.06) saturate(1.6);
+  --pane-edge: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+  --fill: rgb(255 255 255 / 0.72);
+  --control-glass: blur(10px) brightness(1.06) saturate(1.6);
+  --rim: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+  --rim-pressed: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+  --field-rim: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+  --panel-fill: rgb(255 255 255 / 0.8);
+  --panel-glass: blur(20px) saturate(1.8) brightness(1.08);
+  --panel-edge: inset 0 0 0 1px rgb(0 0 0 / 0.15), 0 0 36px rgb(0 0 0 / 0.16);
+  --panel-ink: #1e1e1e;
+  --panel-muted: #4a4a4a;
+  --panel-hover: rgb(30 30 30 / 0.07);
+  --panel-selected: rgb(30 30 30 / 0.1);
+  --panel-pressed: rgb(30 30 30 / 0.14);
+  --hero-fill: #f5f5f5;
+  --hero-edge: inset 0 0 0 1px #e0e0e0;
   color-scheme: light;
 }
 
@@ -158,7 +201,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .m-room { padding: 12px 24px 12px; }
 }
 
-/* The hero: one card, the picture taking all the height its readout leaves. */
+/* The hero: one card, the picture taking all the height its readout leaves; the page with one hairline, as the heroes
+   of Exo's device pages. */
 .m-hero {
   container: hero / inline-size;
   position: relative;
@@ -166,9 +210,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--hair);
-  border-radius: 14px;
-  background: var(--bg);
+  border-radius: 18px;
+  background: var(--hero-fill);
+  box-shadow: var(--hero-edge);
   overflow: hidden;
 }
 
@@ -432,17 +476,30 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 /* ------------------------------------------------------------------ panels and rows */
 
-/* A card: hairline, black inside; its name the only bold type, its rows ruled by softer hairlines. */
+/* A pane of Exo's glass, as the panels of Exo's device pages: the glass is a layer under the panel's content, so its
+   controls are glass too; its name the only bold type, its rows ruled by the pane's hairlines. */
 .m-panel {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   flex: var(--grow, 1) 0 auto;
   width: var(--col-w, 100%);
   min-width: 0;
   padding: 16px 24px 4px;
-  border: 1px solid var(--hair);
-  border-radius: 14px;
-  background: var(--float);
+  border-radius: 18px;
+}
+
+.m-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: var(--pane-fill);
+  backdrop-filter: var(--pane-glass);
+  box-shadow: var(--pane-edge);
 }
 
 .m-grid.is-measuring > .m-panel { flex: 0 0 auto; }
@@ -727,7 +784,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .m-select[aria-expanded='true'] .m-select-chevron { transform: rotate(180deg); }
 
-/* Its menu: a black card over the room, the current choice marked, the pointed one in the hover fill. */
+/* Its menu: large glass over the room (system, below), the current choice marked, the pointed one lit. */
 .m-menu {
   position: fixed;
   z-index: 20;
@@ -735,10 +792,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 4px;
   overflow-y: auto;
   list-style: none;
-  border: 1px solid var(--hair-control);
-  border-radius: 12px;
-  background: var(--bg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   transform-origin: top center;
   animation: m-menu-in var(--dur-base) var(--ease) both;
 }
@@ -804,7 +857,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .m-button.is-primary {
   background: var(--ink);
   box-shadow: none;
-  color: var(--bg);
+  color: var(--primary-ink);
 }
 
 /* Compact (28px), for a row of actions; danger is Bad words on the same control, a step lighter on a dark theme
@@ -823,11 +876,41 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .m-button:not(:disabled):not(.is-primary):hover { background: var(--hover-fill); }
+  :is(.m-button:not(.is-primary), .m-select):not(:disabled):hover { background: var(--hover-fill); }
   .m-button.is-primary:not(:disabled):hover { background-color: var(--primary-hover); }
 }
 
 .m-actions { gap: 12px; align-items: center; }
+
+/* A quiet button (DESIGN.md › Controls, Quiet): bare until the pointer is on it, then the hover lift (a sheet's
+   Close, a row of small actions under a panel). */
+.m-link {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: var(--type-small);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms var(--ease), scale var(--dur-quick) var(--ease);
+}
+
+.m-link:disabled { cursor: default; opacity: 0.4; }
+
+@media (hover: hover) and (pointer: fine) {
+  .m-link:not(:disabled):hover { background: var(--hover-fill); }
+}
+
+.m-link:active:not(:disabled) {
+  background: var(--pressed);
+  scale: 0.97;
+  transition-duration: var(--dur-press);
+}
+
 
 .m-text {
   flex: 1;
@@ -914,30 +997,15 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: var(--type-small);
 }
 
-/* The picker: the library's covers over the room, picked like Exo's own shelves. A sheet (24px) of the menus' frost:
-   the scrim darkens in by its color and the sheet settles in by its size, since a scrim fading whole hid the room from
-   the glass until it landed (Exo's exo-scrim-in and exo-sheet-in). */
-.m-picker-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-  background: rgba(0, 0, 0, 0.78);
-  animation: m-scrim-in var(--dur-base) var(--ease) backwards;
-}
-
+/* The picker: the library's covers, picked like Exo's own shelves, in large glass hung from the Games button that
+   opened it (ui.tsx › Popover). */
 .m-picker {
   display: flex;
   flex-direction: column;
-  width: min(1040px, 100%);
-  height: min(760px, 100%);
-  border: 1px solid var(--hair);
+  width: min(1040px, calc(100vw - 24px));
+  height: min(760px, calc(100vh - 24px));
   border-radius: 24px;
-  background: var(--bg);
   overflow: hidden;
-  animation: m-dialog-in var(--dur-move) var(--ease) backwards;
 }
 
 .m-picker-head {
@@ -953,6 +1021,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: var(--type-title);
   font-weight: 600;
 }
+
+/* A profile's own rows over its games (each connection's polling rate), ruled as a panel's are. */
+.m-picker-settings { padding: 0 24px 16px; }
 
 .m-picker-tools {
   display: flex;
@@ -1073,65 +1144,39 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .m-tile:hover .m-tile-cover { opacity: 1; }
 }
 
-/* ------------------------------------------------------------------ dialog */
+/* ------------------------------------------------------------------ in place */
 
-/* Exo's one question (Exo's styles/dialog.css; ui.tsx › Confirm): 18px, 400 to 420px wide over the scrim, the title in
-   20px and the words in 13px centered, then equal capsules on one row. The scrim darkens in by its color (deeper on
-   Void, as Exo's) and the dialog settles in from 0.98 by its size, its surface there from the first frame. */
-.m-dialog-back {
+/* Nothing pops up over the room to ask (ui.tsx › useAsk, Popover; Exo's DESIGN.md › Confirm). An asking control's words
+   are its question, fading in on the base time while its width springs to them, clipped by its own edge mid-move. */
+.m-ask {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.m-ask-words.is-in {
+  animation: m-fade var(--dur-base) var(--ease) backwards;
+}
+
+/* What takes more room is large glass hung from the control that opened it, in the top layer, never over a scrim: it
+   grows from its control's side, 0.96 to 1 with its opacity on the base time, and fades away on the quick time. */
+.m-pop {
   position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgb(0 0 0 / 0.6);
-  animation: m-scrim-in var(--dur-base) var(--ease) backwards;
-}
-
-:root:is([data-exo-theme="dark"], [data-exo-theme="light"]) .m-dialog-back { background: rgb(0 0 0 / 0.3); }
-
-.m-dialog {
-  display: flex;
-  flex-direction: column;
-  width: min(420px, 100%);
-  min-width: min(400px, 100%);
-  max-height: 100%;
-  padding: 28px 28px 24px;
-  overflow-y: auto;
-  border-radius: 18px;
-  animation: m-dialog-in var(--dur-move) var(--ease) backwards;
-}
-
-.m-dialog > h2 {
-  margin: 0 0 10px;
-  font-size: var(--type-title);
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
-  text-wrap: balance;
-}
-
-.m-dialog-body {
+  inset: auto;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   margin: 0;
-  color: var(--muted);
-  font-size: var(--type-body);
-  line-height: 1.5;
-  text-align: center;
-  text-wrap: pretty;
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  outline: none;
+  transition: opacity var(--dur-base) var(--ease), scale var(--dur-base) var(--ease);
 }
 
-.m-dialog-actions {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.m-dialog-actions > .m-button {
-  justify-content: center;
-  min-width: 0;
+@starting-style {
+  .m-pop:popover-open {
+    opacity: 0;
+    scale: 0.96;
+  }
 }
 
 /* ------------------------------------------------------------------ motion
@@ -1140,9 +1185,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
  * passed in as data-exo-motion (host-look.ts), or Windows' when standalone.
  */
 
-/* Arrive: panels rise 8px into place in turn, 24ms apart; --i is the panel's place, the 8th on share one delay. */
+/* Arrive: panels rise 8px into place in turn, 24ms apart; --i is the panel's place, the 8th on share one delay. A rise
+   alone, as Exo's: a panel holds glass, and glass under a fading parent sees nothing behind it until the fade ends. */
 .m-arrive {
-  animation: m-arrive 280ms var(--ease) both;
+  animation: m-arrive 280ms var(--ease) backwards;
   animation-delay: calc(min(var(--i, 0), 7) * 24ms);
 }
 
@@ -1393,8 +1439,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .m-glide.is-glide-ready [aria-checked='true'] { background-color: transparent; }
 
 @keyframes m-arrive {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+  from { transform: translateY(8px); }
+  to { transform: none; }
 }
 
 @keyframes m-fade { from { opacity: 0; } }
@@ -1405,10 +1451,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   from { translate: -60% 0; }
   to { translate: 0 0; }
 }
-
-/* A scrim darkens in by its color; a dialog settles in by its size (Exo's exo-scrim-in and exo-sheet-in). */
-@keyframes m-scrim-in { from { background-color: transparent; } }
-@keyframes m-dialog-in { from { scale: 0.98; } }
 
 /* A menu settles in from 0.96 under its field, never from nothing. */
 @keyframes m-menu-in { from { opacity: 0; scale: 0.96; } }
@@ -1441,7 +1483,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 /* Reduce motion: nothing moves; the done check simply shows while it lasts. A bar's known amount moves to its new
    place at once; an unknown one holds a still half-lit track. */
-:root[data-exo-motion='reduce'] :is(.m-arrive, .m-switch-in, .m-picker-scrim, .m-picker, .m-dialog, .m-check, .m-error, .m-done-check),
+:root[data-exo-motion='reduce'] :is(.m-arrive, .m-switch-in, .m-check, .m-error, .m-done-check),
 :root[data-exo-motion='reduce'] .m-progress-fill::after {
   animation: none;
 }
@@ -1461,12 +1503,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 :root[data-exo-motion='reduce'] .m-spinner { animation: none; }
 :root[data-exo-motion='reduce'] .m-shine::after { width: 100%; background: color-mix(in srgb, var(--ink) 5%, transparent); animation: none; }
 
-/* A menu is there at once (a fading frost is motion too, as Exo's glass under Reduce motion); a press only darkens. */
+/* A menu or popover is there at once (a fading frost is motion too, as Exo's glass under Reduce motion); a press only
+   darkens; an asking control's width snaps while its words still fade. */
 :root[data-exo-motion='reduce'] .m-menu { animation: none; }
-:root[data-exo-motion='reduce'] :is(.m-select, .m-button):active:not(:disabled) { scale: none; }
+:root[data-exo-motion='reduce'] .m-pop { transition: none; }
+:root[data-exo-motion='reduce'] :is(.m-select, .m-button, .m-link):active:not(:disabled) { scale: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-exo-motion]) :is(.m-arrive, .m-switch-in, .m-picker-scrim, .m-picker, .m-dialog, .m-check, .m-error, .m-done-check),
+  :root:not([data-exo-motion]) :is(.m-arrive, .m-switch-in, .m-check, .m-error, .m-done-check),
   :root:not([data-exo-motion]) .m-progress-fill::after {
     animation: none;
   }
@@ -1486,7 +1530,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   :root:not([data-exo-motion]) .m-shine::after { width: 100%; background: color-mix(in srgb, var(--ink) 5%, transparent); animation: none; }
 
   :root:not([data-exo-motion]) .m-menu { animation: none; }
-  :root:not([data-exo-motion]) :is(.m-select, .m-button):active:not(:disabled) { scale: none; }
+  :root:not([data-exo-motion]) .m-pop { transition: none; }
+  :root:not([data-exo-motion]) :is(.m-select, .m-button, .m-link):active:not(:disabled) { scale: none; }
 }
 
 /* Windows' contrast themes: a plain outlined bar in the system's colors. */
@@ -1499,30 +1544,22 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .m-progress-fill { background: Highlight; }
   .m-progress-fill::after,
   .m-progress-head { display: none; }
-  .m-dialog { border: 1px solid CanvasText; }
+  .m-pop { border: 1px solid CanvasText; }
   .m-shine::after { display: none; }
 }
 
 /* ------------------------------------------------------------- system */
 
-/* Exo's system, as in Exo's own rooms (ui/src/styles/system.css): panels float as the near-black
-   material with a white rim, controls are filled capsules with no outline, switches are 40×24
-   with a round white knob, gray off and green on. */
-.m-panel,
-.m-hero {
-  border-color: transparent;
-  border-radius: 18px;
-  background: var(--float);
-  box-shadow: var(--edge);
-}
-
-/* Controls are flat: the near-black fill and one even hairline, no outline ring, fields the same; primary buttons stay white. */
+/* Exo's system, as in Exo's own rooms (ui/src/styles/system.css): controls are small glass, clear over their own blur
+   and tone inside one even line, with no outline ring, fields the same, the primary the ink; switches are 40×24 with a
+   round knob, gray off and green on. */
 .m-seg,
 .m-select,
 .m-button,
 .m-color {
   border-color: transparent;
   background-color: var(--fill);
+  backdrop-filter: var(--control-glass);
   box-shadow: var(--rim);
 }
 
@@ -1530,15 +1567,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .m-text {
   border-color: transparent;
   background-color: var(--fill);
+  backdrop-filter: var(--control-glass);
   box-shadow: var(--field-rim);
 }
 
 .m-button.is-primary {
   border-color: var(--ink);
+  backdrop-filter: none;
   box-shadow: none;
 }
 
 :is(.m-select, .m-button:not(.is-primary)):active:not(:disabled) {
+  background-color: var(--pressed);
   box-shadow: var(--rim-pressed);
 }
 
@@ -1548,13 +1588,27 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition-duration: var(--dur-press);
 }
 
+/* Large glass (menus and popovers: the games, a test's pad): frosted on the element itself, floating in its halo, with
+   its own words and lifts. Glass hides the page from glass inside it, so a control on it is clear, its one line only. */
 .m-menu,
-.m-picker,
-.m-dialog {
+.m-pop {
+  --ink: var(--panel-ink);
+  --muted: var(--panel-muted);
+  --faint: var(--panel-muted);
+  --hover-fill: var(--panel-hover);
+  --selected: var(--panel-selected);
+  --pressed: var(--panel-pressed);
+  --hair: var(--line-soft);
   border-color: transparent;
-  background: var(--glass-tint);
-  backdrop-filter: var(--glass);
-  box-shadow: var(--edge), 0 16px 40px rgb(0 0 0 / 0.55);
+  background: var(--panel-fill);
+  backdrop-filter: var(--panel-glass);
+  box-shadow: var(--panel-edge);
+  color: var(--ink);
+}
+
+:is(.m-menu, .m-pop) * {
+  --fill: transparent;
+  --control-glass: none;
 }
 
 .m-switch {
@@ -1564,24 +1618,23 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: var(--track);
 }
 
+/* The knob is white in every Appearance, as Exo's. */
 .m-switch-knob {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--ink);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), 0 0 0 0.5px rgb(0 0 0 / 0.2);
 }
 
 .m-switch[aria-checked='true'] { background: var(--good); }
-.m-switch[aria-checked='true'] .m-switch-knob { transform: translateX(16px); background: var(--ink); }
+.m-switch[aria-checked='true'] .m-switch-knob { transform: translateX(16px); background: #fff; }
 
-/* Menus as in Exo's rooms: the floating material, 34px rows rounded 8px, 13px text, the hover
-   gray, and the current choice marked with a check on the right. */
+/* Menus as in Exo's rooms: large glass, 34px rows rounded 8px, 13px text, the hover lift, and the current choice
+   marked with a check on the right. */
 .m-menu {
   padding: 5px;
-  border-color: transparent;
   border-radius: 14px;
-  background: var(--glass-tint);
 }
 
 .m-menu-item {

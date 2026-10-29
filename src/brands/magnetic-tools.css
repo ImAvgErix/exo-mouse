@@ -49,24 +49,13 @@
 
 /* ------------------------------------------------------------------ overlay */
 
-.mt-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.82);
-}
-
+/* A test's pad, hung from its button (ui.tsx › Popover; mouse.css › In place), wide enough for a pad. */
 .mt-sheet {
-  width: min(560px, 100%);
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 24px));
   padding: 24px;
-  border: 1px solid var(--hair-control);
-  border-radius: 14px;
-  background: var(--bg);
+  border-radius: 18px;
 }
 
 .mt-sheet-head {
@@ -96,7 +85,7 @@
 }
 
 .mt-pad.is-big { font-size: calc(20px * var(--exo-scale, 1)); color: var(--ink); }
-.mt-pad.is-wait { background: var(--bg); border-color: var(--muted); }
+.mt-pad.is-wait { border-color: var(--muted); }
 .mt-pad.is-go { background: color-mix(in srgb, var(--good) 28%, transparent); border-color: var(--good); color: var(--ink); }
 
 .mt-ladder {
@@ -128,9 +117,9 @@
 
 .mt-message.is-bad { color: var(--bad); }
 
-/* On the page, Exo's look: a black pad with a hairline to move and click on. */
+/* In Exo's look: a card inside glass is clear with the glass's hairline, never a gray or black hole in it. */
 .mt-pad {
-  border-color: var(--hair-control);
-  background: var(--bg);
+  border-color: var(--line-soft);
+  background: transparent;
   box-shadow: none;
 }

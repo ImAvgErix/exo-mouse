@@ -10,6 +10,7 @@ import {
 } from '@openmouse/protocol/razer'
 import { can } from '../mouse'
 import type { Section } from '../section'
+import { AngleControl } from '../SensorAngle'
 import { ColorField, Dropdown, NumberField, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import './core-extras.css'
 
@@ -265,10 +266,12 @@ function Sensor(section: Section) {
     const angle = status.angleTuning
     rows.push(
       <Row key="at" label="Sensor angle">
-        {angle < -30 || angle > 30
-          ? <span className="m-state">{signed(angle)}</span>
-          : <Slider label="Sensor angle" min={-30} max={30} step={1} value={angle} format={signed}
-              onCommit={v => void apply('setAngleTuning', v)} disabled={busy} />}
+        <AngleControl section={section}>
+          {angle < -30 || angle > 30
+            ? <span className="m-state">{signed(angle)}</span>
+            : <Slider label="Sensor angle" min={-30} max={30} step={1} value={angle} format={signed}
+                onCommit={v => void apply('setAngleTuning', v)} disabled={busy} />}
+        </AngleControl>
       </Row>,
     )
   }

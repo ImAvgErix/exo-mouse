@@ -1,7 +1,10 @@
-import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useGlide } from './glide'
 import { groupOf } from './section'
+
+/** A polling rate as a choice reads it: 500, 1K, 8K. */
+export const hz = (v: number): string => (v >= 1000 ? `${v / 1000}K` : String(v))
 
 /** A section: its name is the only bold type, its rows ruled by hairlines; it rises in when it appears. */
 export function Panel({ title, actions, children }: { title: string; children?: ReactNode; /** Buttons on the title's own line, for a panel that is only a few actions. */ actions?: ReactNode }) {
@@ -119,55 +122,205 @@ export function Spinner({ size = 14, label }: { size?: number; label?: string })
   )
 }
 
+/* ------------------------------------------------------------------ in place
+ * Nothing pops up over the room to ask (Exo's DESIGN.md › Confirm): the control pressed asks where it is, and what
+ * takes more room hangs from that control as large glass. */
+
+/** How long an asking control waits with nothing pressed before it goes back. */
+const ASKING_MS = 4000
+
+const reduced = () => document.documentElement.dataset.exoMotion === 'reduce'
+  || (!document.documentElement.dataset.exoMotion && matchMedia('(prefers-reduced-motion: reduce)').matches)
+
+const token = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+
 /**
- * Exo's one question (Exo's components/ui/Dialog.tsx › ConfirmDialog; mouse.css › Dialog), asked only before what
- * can't be taken back: the title asks it, a line or two say what goes and what stays, then equal capsules, Cancel
- * first and focused so Enter alone never confirms, and the action named for what it does, red when it deletes.
- * Escape or the scrim cancels, Tab stays inside, and focus goes back where it was when it closes.
+ * Asks before it runs: the first press arms the control and its words become the question, its width springing to
+ * them on the move time; a second press (Enter or Space too) runs it. Escape, a press anywhere else, focus leaving or
+ * 4 s with nothing pressed put it back. `arm` asks without a press: a choice that costs, asked beside itself.
  */
-export function Confirm({ title, body, action, danger = false, onConfirm, onClose }: {
-  title: string
-  body?: ReactNode
-  action: string
+export function useAsk(run: () => void) {
+  const [armed, setArmed] = useState(false)
+  const [asked, setAsked] = useState(false)
+  const ref = useRef<HTMLButtonElement>(null)
+  const was = useRef<number | null>(null)
+  const go = useRef(run)
+  useEffect(() => { go.current = run })
+  const set = (next: boolean) => {
+    was.current = ref.current?.getBoundingClientRect().width ?? null
+    setArmed(next)
+    setAsked(true)
+  }
+  useLayoutEffect(() => {
+    const button = ref.current
+    const from = was.current
+    was.current = null
+    if (!button || from === null || reduced()) return
+    const to = button.getBoundingClientRect().width
+    if (Math.abs(to - from) >= 1) button.animate([{ width: `${from}px` }, { width: `${to}px` }], { duration: parseFloat(token('--dur-move', '220')), easing: token('--ease-spring', 'ease-out') })
+  }, [armed])
+  useEffect(() => {
+    const button = ref.current
+    if (!armed || !button) return
+    const back = () => setArmed(false)
+    const timer = window.setTimeout(back, ASKING_MS)
+    const away = (e: PointerEvent) => { if (!button.contains(e.target as Node)) back() }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); back() } }
+    document.addEventListener('pointerdown', away, true)
+    button.addEventListener('keydown', key)
+    button.addEventListener('focusout', back)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('pointerdown', away, true)
+      button.removeEventListener('keydown', key)
+      button.removeEventListener('focusout', back)
+    }
+  }, [armed])
+  return {
+    armed,
+    ref,
+    /** The control's words: the question while armed, fading in as they change. */
+    words: (question: string, rest: ReactNode) => <span key={armed ? 'ask' : 'rest'} className={`m-ask-words${asked ? ' is-in' : ''}`}>{armed ? question : rest}</span>,
+    press: () => { if (!armed) { set(true); return } set(false); go.current() },
+    arm: () => { ref.current?.focus({ preventScroll: true }); set(true) },
+  }
+}
+
+/** A button that asks in place before it runs (useAsk), its question in Bad when it deletes. */
+export function AskButton({ question, danger = false, onConfirm, className, children, disabled }: {
+  question: string
   danger?: boolean
   onConfirm: () => void
+  className: string
+  children: ReactNode
+  disabled?: boolean
+}) {
+  const ask = useAsk(onConfirm)
+  return (
+    <button ref={ask.ref} type="button" className={`${className} m-ask${ask.armed ? ' is-armed' : ''}${ask.armed && danger ? ' is-danger' : ''}`}
+      disabled={disabled} onClick={ask.press}>
+      {ask.words(question, children)}
+    </button>
+  )
+}
+
+/** The last press in the frame, so a popover knows the control it hangs from even when that control takes no focus. */
+let lastPress: { target: Element; time: number } | null = null
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerdown', e => { if (e.target instanceof Element) lastPress = { target: e.target, time: performance.now() } }, true)
+}
+
+const HANG_GAP = 6
+const HANG_EDGE = 12
+
+/** Under its control from the control's left edge, or its right edge where the frame runs out; above it when there is
+ * no room below; never past the frame's edge. With no control it hangs from the frame's top, centered. */
+function hang(box: HTMLElement, from: DOMRect | null) {
+  const width = box.offsetWidth
+  const height = box.offsetHeight
+  const at = from ?? new DOMRect((window.innerWidth - width) / 2, HANG_EDGE, width, 0)
+  const above = at.top - HANG_GAP - height
+  const up = at.bottom + HANG_GAP + height > window.innerHeight - HANG_EDGE && above >= HANG_EDGE
+  const right = at.left + width > window.innerWidth - HANG_EDGE
+  const top = up ? above : Math.max(HANG_EDGE, Math.min(at.bottom + HANG_GAP, window.innerHeight - HANG_EDGE - height))
+  const left = Math.max(HANG_EDGE, Math.min(right ? at.right - width : at.left, window.innerWidth - HANG_EDGE - width))
+  box.style.top = `${Math.round(top)}px`
+  box.style.left = `${Math.round(left)}px`
+  box.style.transformOrigin = `${right ? 'right' : 'left'} ${up ? 'bottom' : 'top'}`
+}
+
+/** Glass leaves by fading on the quick time: a still copy holds its place while it fades, since React has already taken
+ * the popover away. Under Reduce motion it is simply gone. */
+function fadeOut(box: HTMLElement) {
+  if (reduced()) return
+  const copy = box.cloneNode(true) as HTMLElement
+  copy.inert = true
+  copy.setAttribute('aria-hidden', 'true')
+  copy.removeAttribute('role')
+  for (const named of copy.querySelectorAll('[id]')) named.removeAttribute('id')
+  queueMicrotask(() => {
+    if (box.isConnected) return
+    copy.style.transition = 'none'
+    document.body.append(copy)
+    copy.showPopover()
+    const quick = parseFloat(token('--dur-quick', '120'))
+    const gone = () => copy.remove()
+    window.setTimeout(gone, quick + 100)
+    copy.animate([{ opacity: 1 }, { opacity: 0 }], { duration: quick, easing: token('--ease', 'ease-out'), fill: 'forwards' }).finished.then(gone, gone)
+  })
+}
+
+/**
+ * Large glass hung from the control that opened it, in the top layer, never in the room's middle over a scrim: a
+ * profile's games, a test's pad. It grows from its control's side and fades away; Escape or a press outside closes it
+ * (that press goes no further), Tab stays inside, focus starts on what asks for it (`autoFocus`), else the popover, and
+ * goes back where it was when it closes.
+ */
+export function Popover({ label, labelledBy, className, onClose, children }: {
+  label?: string
+  labelledBy?: string
+  className: string
   onClose: () => void
+  children: ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
-  const cancel = useRef<HTMLButtonElement>(null)
-  const id = useId()
   const close = useRef(onClose)
-  close.current = onClose
-  useEffect(() => {
-    const back = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    cancel.current?.focus()
+  useEffect(() => { close.current = onClose })
+  // What it holds mounts once it shows, so a field's autoFocus lands: nothing takes focus in a popover not yet shown.
+  const [shown, setShown] = useState(false)
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    const pressed = lastPress && performance.now() - lastPress.time < 1500 ? lastPress.target.closest('button, a, input, [tabindex]') ?? lastPress.target : null
+    const focused = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
+    const control = pressed?.isConnected ? pressed : focused
+    const kept = control?.getBoundingClientRect() ?? null
+    if (!el.matches(':popover-open')) el.showPopover()
+    setShown(true)
+    const fit = () => hang(el, control?.isConnected ? control.getBoundingClientRect() : kept)
+    fit()
+    // A field that asks for focus takes it as it mounts; else the popover holds it, so Tab goes on from there.
+    requestAnimationFrame(() => { if (!el.contains(document.activeElement)) el.focus({ preventScroll: true }) })
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close.current() }
-      if (e.key !== 'Tab' || !box.current) return
-      e.preventDefault()
-      const buttons = [...box.current.querySelectorAll<HTMLElement>('button:not(:disabled)')]
-      const at = buttons.indexOf(document.activeElement as HTMLElement)
-      buttons[(at + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length]?.focus()
+      if (e.defaultPrevented) return
+      if (e.key === 'Escape') { e.preventDefault(); close.current(); return }
+      if (e.key !== 'Tab') return
+      const stops = [...el.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+      if (stops.length === 0) { e.preventDefault(); return }
+      const at = stops.indexOf(document.activeElement as HTMLElement)
+      if (at === -1 || (e.shiftKey ? at === 0 : at === stops.length - 1)) {
+        e.preventDefault()
+        stops[e.shiftKey ? stops.length - 1 : 0].focus()
+      }
     }
-    window.addEventListener('keydown', key, true)
+    const away = (e: PointerEvent) => {
+      const target = e.target as Element
+      if (el.contains(target) || target.closest?.('.m-menu')) return
+      e.preventDefault()
+      e.stopPropagation()
+      const swallow = (next: Event) => { next.preventDefault(); next.stopPropagation() }
+      window.addEventListener('click', swallow, { capture: true, once: true })
+      window.setTimeout(() => window.removeEventListener('click', swallow, true), 500)
+      close.current()
+    }
+    const sizes = new ResizeObserver(fit)
+    sizes.observe(el)
+    window.addEventListener('resize', fit)
+    window.addEventListener('keydown', key)
+    document.addEventListener('pointerdown', away, true)
     return () => {
-      window.removeEventListener('keydown', key, true)
-      if (back?.isConnected) back.focus()
+      sizes.disconnect()
+      window.removeEventListener('resize', fit)
+      window.removeEventListener('keydown', key)
+      document.removeEventListener('pointerdown', away, true)
+      fadeOut(el)
+      if (focused?.isConnected) focused.focus({ preventScroll: true })
     }
   }, [])
-  // On the page itself: a panel's arrive animation leaves a transform that would hold a fixed overlay inside the panel.
-  return createPortal(
-    <div className="m-dialog-back" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div ref={box} className="m-dialog" role="dialog" aria-modal="true" aria-labelledby={id} aria-describedby={body ? `${id}-body` : undefined}>
-        <h2 id={id}>{title}</h2>
-        {body ? <p id={`${id}-body`} className="m-dialog-body">{body}</p> : null}
-        <div className="m-dialog-actions">
-          <button ref={cancel} type="button" className="m-button" onClick={onClose}>Cancel</button>
-          <button type="button" className={`m-button ${danger ? 'is-danger' : 'is-primary'}`} onClick={onConfirm}>{action}</button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <div ref={box} popover="manual" className={`m-pop ${className}`} role="dialog" aria-modal="true" aria-label={label} aria-labelledby={labelledBy} tabIndex={-1}>
+      {shown ? children : null}
+    </div>
   )
 }
 

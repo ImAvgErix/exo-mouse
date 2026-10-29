@@ -3,8 +3,9 @@ import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, type Step, type useMouse } from './mouse'
 import { call, onHostEvent, tell } from './exo-hid'
 import { GamePicker, LinkedCovers, type Game } from './GamePicker'
-import { Confirm, Panel, Spinner } from './ui'
+import { AskButton, Panel, Row, Segmented, Spinner, hz } from './ui'
 import { indicatorColor } from './Finalmouse'
+import { linkRates } from './brands/logitech'
 
 type Client = ReturnType<typeof useMouse>['client']
 /** games: the Exo game ids this profile is for; it applies while one of them runs. */
@@ -75,6 +76,8 @@ export function snapshot(status: MouseStatus, client: Client): Step[] {
     hits.buttons.forEach((b, i) => add('setAnalogButtonTuning', i, b.rapidTriggerEnabled === undefined
       ? { actuation: b.actuation, rapidTrigger: b.rapidTrigger, haptics: b.haptics }
       : { actuation: b.actuation, rapidTrigger: b.rapidTrigger, haptics: b.haptics, rapidTriggerEnabled: b.rapidTriggerEnabled }))
+  // A Logitech mouse running from this PC: its bunny hop, as Exo last wrote it (mouse.ts fills it in only then).
+  add('setHostBunnyHopMs', status.hostBunnyHopMs)
   if (!ui.hideSleepCard) add('setSleepTimeout', status.sleepTimeout)
   if (status.powerModes?.length) add('setPowerMode', status.powerMode)
   if (slx) {
@@ -97,19 +100,28 @@ export function snapshot(status: MouseStatus, client: Client): Step[] {
   return steps
 }
 
+/** The rate a connection takes for the one wanted: that one where it is allowed, else the nearest below, else its lowest. */
+function rateFor(wanted: number, allowed: readonly number[]): number {
+  if (!allowed.length || allowed.includes(wanted)) return wanted
+  const below = allowed.filter(rate => rate <= wanted)
+  return below.length ? Math.max(...below) : Math.min(...allowed)
+}
+
+/** A profile's polling rate on a connection: the one saved for it, else the profile's own as that connection takes it. */
+const rateOn = (profile: Pick<Profile, 'steps' | 'polling'>, link: keyof Polling, allowed: readonly number[]) =>
+  rateFor(profile.polling?.[link] ?? (profile.steps.find(s => s[0] === 'setPollingRate')?.[1][0] as number), allowed)
+
 /**
- * A profile's settings as the connection the mouse is on takes them: its polling rate saved for this connection, else
- * the nearest rate this connection allows, never one it would refuse (which would leave the profile retrying).
+ * A profile's settings as the mouse takes them now: the polling rate saved for the connection it is on, else the
+ * nearest rate this connection allows, never one it would refuse (which would leave the profile retrying); bunny hop
+ * for a mouse running from this PC only while it does.
  */
 function fit(profile: Pick<Profile, 'steps' | 'polling'>, status: MouseStatus): Step[] {
   const on = status.connectionType ?? 'Wired'
-  const allowed = status.supportedPollingRates ?? []
-  return profile.steps.map(step => {
-    if (step[0] !== 'setPollingRate') return step
-    const wanted = profile.polling?.[on] ?? (step[1][0] as number)
-    if (!allowed.length || allowed.includes(wanted)) return ['setPollingRate', [wanted]] as Step
-    const below = allowed.filter(rate => rate <= wanted)
-    return ['setPollingRate', [below.length ? Math.max(...below) : Math.min(...allowed)]] as Step
+  return profile.steps.flatMap((step): Step[] => {
+    if (step[0] === 'setHostBunnyHopMs') return status.hostBunnyHopMs == null ? [] : [step]
+    if (step[0] !== 'setPollingRate') return [step]
+    return [['setPollingRate', [rateOn(profile, on, status.supportedPollingRates ?? [])]]]
   })
 }
 
@@ -195,7 +207,6 @@ export function Profiles({ device, status, client, applyAll, busy }: {
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
-  const [deleting, setDeleting] = useState<string | null>(null)
   /** The profile being written (its Apply carries the work band), then the one just written: Active with a check. */
   const [applying, setApplying] = useState<string | null>(null)
   const [applied, setApplied] = useState<string | null>(null)
@@ -326,18 +337,17 @@ export function Profiles({ device, status, client, applyAll, busy }: {
     setName('')
   }
   const update = (id: string) => save(list.map(p => p.id === id ? { ...p, steps: now, polling: pollingNow(status, p.polling), savedAt: new Date().toISOString() } : p))
+  /** Each connection's rate where the mouse knows both; both are kept, so the one not changed stays as shown. */
+  const links = linkRates(status)
+  const setRates = (id: string, polling: Polling) => save(list.map(p => p.id === id ? { ...p, polling } : p))
   const rename = (id: string) => {
     const clean = draft.trim().slice(0, 40)
     // Desktop's name is taken: another profile cannot become it.
     if (clean && !isDesktopName(clean)) save(list.map(p => p.id === id && !p.isDefault ? { ...p, name: clean } : p))
     setRenaming(null)
   }
-  /** Delete asks first (Desktop is never deleted). */
-  const asked = list.find(p => p.id === deleting && !p.isDefault)
-  const remove = (id: string) => {
-    save(list.filter(p => p.id !== id))
-    setDeleting(null)
-  }
+  /** Delete asks on its button first (Desktop is never deleted). */
+  const remove = (id: string) => save(list.filter(p => p.id !== id || p.isDefault))
 
   return (
     <Panel title="Profiles">
@@ -374,7 +384,7 @@ export function Profiles({ device, status, client, applyAll, busy }: {
               <>
                 <button type="button" className="m-button is-compact" aria-haspopup="dialog" onClick={() => setLinking(p.id)}>Games</button>
                 <button type="button" className="m-button is-compact" onClick={() => { setRenaming(p.id); setDraft(p.name) }}>Rename</button>
-                <button type="button" className="m-button is-compact is-danger" aria-haspopup="dialog" onClick={() => setDeleting(p.id)}>Delete</button>
+                <AskButton className="m-button is-compact is-danger" question="Delete profile?" danger onConfirm={() => remove(p.id)}>Delete</AskButton>
               </>
             )}
           </span>
@@ -382,16 +392,23 @@ export function Profiles({ device, status, client, applyAll, busy }: {
       ))}
       {(() => {
         const picking = list.find(p => p.id === linking)
-        return picking ? (
+        if (!picking) return null
+        // A mouse whose other connection's rates are known (a Logitech's profile format keeps both) sets each here,
+        // without plugging in or out; the one it is on is used when a game starts.
+        const shown = links && picking.steps.some(s => s[0] === 'setPollingRate')
+          ? { Wireless: rateOn(picking, 'Wireless', links.Wireless), Wired: rateOn(picking, 'Wired', links.Wired) }
+          : null
+        return (
           <GamePicker profile={picking} profiles={list} games={installed}
-            onToggle={game => toggleGame(picking, game)} onClose={() => setLinking(null)} />
-        ) : null
+            onToggle={game => toggleGame(picking, game)} onClose={() => setLinking(null)}
+            settings={links && shown ? (['Wireless', 'Wired'] as const).map(link => (
+              <Row key={link} label={`${link} polling rate`}>
+                <Segmented label={`${link} polling rate`} options={links[link].map(rate => ({ value: rate, label: hz(rate) }))}
+                  value={shown[link]} onChange={rate => setRates(picking.id, { ...shown, [link]: rate })} />
+              </Row>
+            )) : null} />
+        )
       })()}
-      {asked ? (
-        <Confirm title="Delete this profile?" action="Delete" danger
-          body={`${asked.name} and its linked games go. Your mouse keeps the settings it has now.`}
-          onConfirm={() => remove(asked.id)} onClose={() => setDeleting(null)} />
-      ) : null}
       <div className="m-row m-profile-new">
         <input className="m-text" aria-label="New profile name" placeholder="Name" maxLength={40} value={name}
           onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }} />

@@ -13,7 +13,7 @@ import { CpuCore } from './CpuCore'
 import { deviceImage } from './device-images'
 import { signalLevel, signalWord, useMouseAlerts } from './alerts'
 import { useSections } from './layout'
-import { ColorField, NumberField, Panel, Row, Segmented, Select, Slider, Switch } from './ui'
+import { ColorField, Dropdown, NumberField, Panel, Row, Segmented, Select, Slider, Switch, hz } from './ui'
 
 export function App() {
   return <Room mouse={useMouse()} />
@@ -404,10 +404,6 @@ function debounceChoices(client: Section['client']): number[] {
   return steps.includes(max) ? steps : [...steps, max]
 }
 
-function hz(v: number): string {
-  return v >= 1000 ? `${v / 1000}K` : String(v)
-}
-
 function Performance(section: Section) {
   const { status, client, apply, busy } = section
   const ui = status.ui ?? {}
@@ -554,16 +550,31 @@ function Lighting(section: Section) {
 
 const SLEEP = [30, 60, 120, 300, 600, 900]
 
-function seconds(v: number): string {
-  return v < 60 ? `${v} s` : `${Math.round(v / 60)} min`
+/**
+ * The sleep times this mouse takes: its driver's own list (an AJAZZ takes whole minutes, so 30 s would fail there),
+ * thinned to the nearest of Exo's steps when it runs long (and Never, when the driver offers it); Exo's steps for a
+ * driver with no list.
+ */
+function sleepChoices(client: Section['client']): number[] {
+  const own = can(client, 'getSleepOptions') ? [...(client as unknown as { getSleepOptions: () => readonly number[] }).getSleepOptions()] : []
+  if (own.length === 0) return SLEEP
+  if (own.length <= 12) return own
+  const near = (v: number) => own.reduce((best, o) => (Math.abs(o - v) < Math.abs(best - v) ? o : best))
+  return [...new Set([...(own.includes(0) ? [0] : []), ...SLEEP.map(near)])].sort((a, b) => a - b)
 }
 
+/** 0 is the mouse never sleeping (AJAZZ's panel offers it). */
+function seconds(v: number): string {
+  return v <= 0 ? 'Never' : v < 60 ? `${v} s` : v % 60 === 0 ? `${v / 60} min` : `${(v / 60).toFixed(1)} min`
+}
+
+/** Sleep after as a menu: six times or more ran a pill onto two lines in a 420 to 460px column. */
 function Power({ status, client, apply, busy }: Section) {
   if (status.sleepTimeout == null || !can(client, 'setSleepTimeout') || status.ui?.hideSleepCard) return null
   return (
     <Panel title="Power">
       <Row label="Sleep after">
-        <Segmented label="Sleep after" options={withCurrent(SLEEP, status.sleepTimeout).map(v => ({ value: v, label: seconds(v) }))}
+        <Dropdown label="Sleep after" options={withCurrent(sleepChoices(client), status.sleepTimeout).map(v => ({ value: v, label: seconds(v) }))}
           value={status.sleepTimeout} onChange={v => void apply('setSleepTimeout', v)} disabled={busy} />
       </Row>
     </Panel>

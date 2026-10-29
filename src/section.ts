@@ -33,7 +33,7 @@ const BY_TITLE: Record<string, Group> = {
   'Multiclick filter': 'Buttons', 'Scroll wheel': 'Buttons', Scrolling: 'Buttons', 'Rapid fire': 'Buttons',
   Macros: 'Buttons', Haptics: 'Buttons',
   Profiles: 'Profiles',
-  'Polling test': 'Tests', 'Click test': 'Tests', 'HITS speed': 'Tests',
+  'Polling test': 'Tests', 'Click test': 'Tests', 'Sensor angle': 'Tests', 'HITS speed': 'Tests',
 }
 
 export const groupOf = (title: string): Group => BY_TITLE[title] ?? 'Device'

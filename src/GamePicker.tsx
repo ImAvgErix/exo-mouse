@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Segmented } from './ui'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Popover, Segmented } from './ui'
 
 export type Game = { id: string; title: string; cover?: string | null }
 type Owner = { id: string; name: string; games?: string[] }
@@ -34,14 +33,18 @@ export function LinkedCovers({ ids, games }: { ids: string[]; games: Map<string,
  * The games a profile is for, picked from the installed library by cover: this
  * profile's games first and ringed, a game another profile has dimmed with that
  * profile's name (choosing it moves it here). Search by title; Linked shows
- * only this profile's. Escape or Done closes.
+ * only this profile's. It hangs from the Games button that opened it; Escape,
+ * a press outside or Done closes. settings: the profile's own rows over its
+ * games (each connection's polling rate), which make it the profile's own,
+ * named for it.
  */
-export function GamePicker({ profile, profiles, games, onToggle, onClose }: {
+export function GamePicker({ profile, profiles, games, onToggle, onClose, settings }: {
   profile: Owner
   profiles: Owner[]
   games: Game[]
   onToggle: (game: string) => void
   onClose: () => void
+  settings?: ReactNode
 }) {
   const [query, setQuery] = useState('')
   const [only, setOnly] = useState<'all' | 'linked'>('all')
@@ -56,48 +59,39 @@ export function GamePicker({ profile, profiles, games, onToggle, onClose }: {
   const needle = query.trim().toLowerCase()
   const shown = order.filter(g => (only === 'all' || mine.has(g.id)) && (!needle || g.title.toLowerCase().includes(needle)))
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  // On the page itself: a panel's arrive animation leaves a transform that would hold a fixed overlay inside the panel.
-  return createPortal(
-    <div className="m-picker-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <section className="m-picker" role="dialog" aria-modal="true" aria-labelledby="m-picker-title">
-        <header className="m-picker-head">
-          <h2 id="m-picker-title" className="m-picker-title">Games for {profile.name}</h2>
-          <button type="button" className="m-button is-primary" onClick={onClose}>Done</button>
-        </header>
-        <div className="m-picker-tools">
-          <input className="m-text" aria-label="Find a game" placeholder="Find a game" autoFocus value={query} onChange={e => setQuery(e.target.value)} />
-          <Segmented label="Show" options={[{ value: 'all', label: 'All' }, { value: 'linked', label: `Linked ${mine.size}` }]} value={only} onChange={setOnly} />
-        </div>
-        <div className="m-picker-grid" role="group" aria-label={`Games for ${profile.name}`}>
-          {shown.map(g => {
-            const on = mine.has(g.id)
-            const elsewhere = !on ? owner.get(g.id) : undefined
-            return (
-              <button key={g.id} type="button" role="checkbox" aria-checked={on}
-                aria-label={`${g.title}${elsewhere ? `, on ${elsewhere}` : ''}`}
-                className={`m-tile${on ? ' is-on' : ''}${elsewhere ? ' is-elsewhere' : ''}`}
-                onClick={() => onToggle(g.id)}>
-                <span className="m-tile-art">
-                  <Cover game={g} className="m-tile-cover" />
-                  {on ? <span className="m-tile-check" aria-hidden="true" /> : null}
-                  {elsewhere ? <span className="m-tile-owner">On {elsewhere}</span> : null}
-                </span>
-                <span className="m-tile-title">{g.title}</span>
-              </button>
-            )
-          })}
-          {shown.length === 0 ? (
-            <p className="m-picker-empty">{games.length === 0 ? 'No installed games.' : only === 'linked' ? 'No games linked yet.' : `No game called "${query.trim()}".`}</p>
-          ) : null}
-        </div>
-      </section>
-    </div>,
-    document.body,
+  return (
+    <Popover className="m-picker" labelledBy="m-picker-title" onClose={onClose}>
+      <header className="m-picker-head">
+        <h2 id="m-picker-title" className="m-picker-title">{settings ? profile.name : `Games for ${profile.name}`}</h2>
+        <button type="button" className="m-button is-primary" onClick={onClose}>Done</button>
+      </header>
+      {settings ? <div className="m-picker-settings">{settings}</div> : null}
+      <div className="m-picker-tools">
+        <input className="m-text" aria-label="Find a game" placeholder="Find a game" autoFocus value={query} onChange={e => setQuery(e.target.value)} />
+        <Segmented label="Show" options={[{ value: 'all', label: 'All' }, { value: 'linked', label: `Linked ${mine.size}` }]} value={only} onChange={setOnly} />
+      </div>
+      <div className="m-picker-grid" role="group" aria-label={`Games for ${profile.name}`}>
+        {shown.map(g => {
+          const on = mine.has(g.id)
+          const elsewhere = !on ? owner.get(g.id) : undefined
+          return (
+            <button key={g.id} type="button" role="checkbox" aria-checked={on}
+              aria-label={`${g.title}${elsewhere ? `, on ${elsewhere}` : ''}`}
+              className={`m-tile${on ? ' is-on' : ''}${elsewhere ? ' is-elsewhere' : ''}`}
+              onClick={() => onToggle(g.id)}>
+              <span className="m-tile-art">
+                <Cover game={g} className="m-tile-cover" />
+                {on ? <span className="m-tile-check" aria-hidden="true" /> : null}
+                {elsewhere ? <span className="m-tile-owner">On {elsewhere}</span> : null}
+              </span>
+              <span className="m-tile-title">{g.title}</span>
+            </button>
+          )
+        })}
+        {shown.length === 0 ? (
+          <p className="m-picker-empty">{games.length === 0 ? 'No installed games.' : only === 'linked' ? 'No games linked yet.' : `No game called "${query.trim()}".`}</p>
+        ) : null}
+      </div>
+    </Popover>
   )
 }

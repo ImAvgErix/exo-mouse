@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { Progress, Row, Segmented } from '../ui'
+import { Popover, Progress, Row, Segmented } from '../ui'
 import './magnetic-tools.css'
 
 // Adapted from OpenMouse (AGPL-3.0): src/hits-test.ts, src/ui/polling-stats.ts,
@@ -9,26 +8,16 @@ import './magnetic-tools.css'
 
 /* ------------------------------------------------------------------ shared pieces */
 
-/** A sheet over the room. Escape or a click outside closes it. */
+/** A test's pad, hung from the button that opened it (ui.tsx › Popover). Escape, a press outside or Close closes it. */
 export function Overlay({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  const close = useRef(onClose)
-  close.current = onClose
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close.current() }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
-  }, [])
-  return createPortal(
-    <div className="mt-overlay" role="dialog" aria-modal="true" aria-label={title} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="mt-sheet">
-        <div className="mt-sheet-head">
-          <h2 className="m-panel-title">{title}</h2>
-          <button type="button" className="m-link" onClick={onClose}>Close</button>
-        </div>
-        {children}
+  return (
+    <Popover className="mt-sheet" label={title} onClose={onClose}>
+      <div className="mt-sheet-head">
+        <h2 className="m-panel-title">{title}</h2>
+        <button type="button" className="m-link" onClick={onClose}>Close</button>
       </div>
-    </div>,
-    document.body,
+      {children}
+    </Popover>
   )
 }
 

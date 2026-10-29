@@ -17,7 +17,8 @@ type Collection = {
 
 type Summary = { key: string; vendorId: number; productId: number; productName: string; collections: Collection[] }
 
-type Reply = { ok: boolean; message?: string; data?: string; devices?: Summary[] }
+/** look: Exo's glass as CSS values, with its Appearance (host-look.ts). */
+type Reply = { ok: boolean; message?: string; data?: string; devices?: Summary[]; look?: unknown }
 
 // ------------------------------------------------------------------ host channel
 

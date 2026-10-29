@@ -4,6 +4,7 @@ import type { SupportedClient } from '@openmouse/protocol/drivers/registry'
 /** Every brand's driver: about 1.3 MB, loaded after the page has drawn, once. */
 const registry = () => import('@openmouse/protocol/drivers/registry')
 import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
+import { capabilitiesForFormat } from '@openmouse/protocol/drivers/logitech/onboard-profiles'
 import { exoHid, onHostEvent } from './exo-hid'
 
 /** One connectable device: the interface its best driver wants. */
@@ -76,6 +77,29 @@ const CONFIRM_MS = 800
 const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms))
 
 /**
+ * Logitech's bunny hop while the mouse runs from this PC (Host mode) has no read, so the library leaves it for the
+ * control panel to fill in: what Exo last wrote to this mouse, kept in this frame, and off until then (G HUB starts
+ * a Host session off).
+ */
+const HOST_BUNNY_HOP = 'exo-mouse.host-bunny-hop'
+
+function hostBunnyHops(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(HOST_BUNNY_HOP) ?? '{}') as Record<string, number> } catch { return {} }
+}
+
+function withHostBunnyHop(status: MouseStatus, client: SupportedClient, id: string): MouseStatus {
+  if (status.ui?.family !== 'logitech-hidpp' || status.deviceMode !== 'Host' || !can(client, 'setHostBunnyHopMs')
+    || !capabilitiesForFormat(status.onboardProfileFormat?.id).bunnyHop) return status
+  const ms = hostBunnyHops()[id]
+  return { ...status, hostBunnyHopMs: typeof ms === 'number' ? ms : 0 }
+}
+
+function rememberHostBunnyHop(id: string, ms: unknown) {
+  if (typeof ms !== 'number') return
+  try { localStorage.setItem(HOST_BUNNY_HOP, JSON.stringify({ ...hostBunnyHops(), [id]: ms })) } catch { /* it reads as off after a restart */ }
+}
+
+/**
  * The connected mouse: found, opened and read, then read again every few
  * seconds while the room is on screen (and only for its battery behind it).
  * Every change goes through `apply`, which reads the mouse back so what
@@ -84,6 +108,8 @@ const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(res
 export function useMouse() {
   const [state, setState] = useState<MouseState>({ phase: 'looking', candidates: [], current: null, brand: '', status: null, error: null, busy: false, readAt: 0 })
   const client = useRef<SupportedClient | null>(null)
+  /** The open mouse's id, which keeps what it can't report (withHostBunnyHop). */
+  const openId = useRef('')
   const writing = useRef(0)
   /** The open mouse was opened again since its last good read. */
   const reopened = useRef(false)
@@ -139,9 +165,10 @@ export function useMouse() {
         if (!next) continue
         try {
           if (can(next, 'open')) await invoke(next, 'open', [])
-          const status = await next.readStatus()
+          const status = withHostBunnyHop(await next.readStatus(), next, pick.id)
           if (!live) { await next.close().catch(() => undefined); return }
           client.current = next
+          openId.current = pick.id
           reopened.current = false
           const current = device === pick.device ? pick : { ...pick, device, others: [pick.device, ...pick.others.filter(d => d !== device)] }
           setState({ phase: 'ready', candidates, current, brand: drivers.deviceBrand(next), status, error: null, busy: false, readAt: Date.now() })
@@ -160,7 +187,7 @@ export function useMouse() {
     const c = client.current
     if (!c || writing.current > 0) return
     try {
-      const status = await c.readStatus()
+      const status = withHostBunnyHop(await c.readStatus(), c, openId.current)
       reopened.current = false
       if (client.current === c && writing.current === 0) setState(s => ({ ...s, status, readAt: Date.now() }))
     } catch {
@@ -209,7 +236,10 @@ export function useMouse() {
       let failed: unknown = null
       for (const [method, args] of steps) {
         if (!can(c, method)) continue
-        try { await invoke(c, method, args) } catch (e) { failed ??= e }
+        try {
+          await invoke(c, method, args)
+          if (method === 'setHostBunnyHopMs') rememberHostBunnyHop(openId.current, args[0])
+        } catch (e) { failed ??= e }
       }
       if (steps.some(([method]) => LEAVES_THIS_PC.has(method))) {
         if (failed) throw failed
@@ -218,7 +248,7 @@ export function useMouse() {
       // The mouse takes a change at once but answers a read sent straight after it with
       // the old values; a short settle reads what it took, and a second read confirms it.
       await sleep(SETTLE_MS)
-      const status = await c.readStatus()
+      const status = withHostBunnyHop(await c.readStatus(), c, openId.current)
       if (client.current === c) setState(s => ({ ...s, status, readAt: Date.now() }))
       window.setTimeout(() => void refresh(), CONFIRM_MS)
       if (failed) throw failed

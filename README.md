@@ -9,6 +9,9 @@ driver or account, for every mouse
   battery and profile in Exo's top bar.
 - **Settings:** DPI, polling rate, lift-off, motion sync, buttons, lighting,
   sleep and more, showing only what your mouse has.
+- **Sensor angle:** swipe side to side with your own grip and it measures the
+  angle your swipes run at, then sets the mouse's own sensor angle to flatten
+  them and checks that they come out level.
 - **CPU core:** measures whether the mouse's input waits on a busy CPU and,
   through Exo, gives it a quiet one of its own.
 - **Profiles:** each one linked to games and switched on by itself when one of
@@ -51,7 +54,7 @@ own; it reaches devices only through a small message protocol with its host:
 | event `room.visible` | Whether the Devices room is on screen |
 | `exo.textScale`, event `exo.textScale { scale }` | The host's text size, as a factor on every font size |
 | `exo.motion`, event `exo.motion { motion }` | `reduce` or `full`: the host's reduce-motion setting, which stops every move here too |
-| `exo.theme`, event `exo.theme { theme }` | `light`, `dark` or `void`: the host's Appearance, which Exo Mouse is drawn in |
+| `exo.theme` (reply `{ data: theme, look }`), event `exo.theme { theme, look }` | `light`, `dark` or `void`: the host's Appearance, which Exo Mouse is drawn in; `look` is the host's glass for it as CSS values by the names in `src/host-look.ts` (page and words, a pane, a control, large glass, the hero), which replace `mouse.css`'s own |
 
 `src/exo-hid.ts` turns that into the browser's WebHID interface, so the
 protocol library's drivers run unchanged.
@@ -59,7 +62,7 @@ protocol library's drivers run unchanged.
 ## Changes to OpenMouse
 
 `scripts/patch-protocol.mjs` runs before every build and applies fixes to
-`@openmouse/protocol` 0.46.0 until upstream ships them. It stops the build when
+`@openmouse/protocol` 0.48.1 until upstream ships them. It stops the build when
 the library version changes, so a fixed release is noticed and its patch removed.
 
 ## Build

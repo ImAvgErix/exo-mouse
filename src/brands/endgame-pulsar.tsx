@@ -3,6 +3,7 @@ import type { MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { EGG_BUTTON_ACTION_OPTIONS } from '@openmouse/protocol/endgame-gear-op1'
 import { can } from '../mouse'
 import type { Section } from '../section'
+import { AngleControl } from '../SensorAngle'
 import { Dropdown, Panel, Row, Segmented, Select, Slider, Switch } from '../ui'
 import './endgame-pulsar.css'
 
@@ -52,8 +53,9 @@ const has = <T,>(v: T | null | undefined): v is T => v !== null && v !== undefin
 
 // ------------------------------------------------------------------ OP1 sensor
 
-function EggSensor({ status: base, client, apply, applyAll, busy }: Section) {
-  const status = base as EggStatus
+function EggSensor(section: Section) {
+  const { client, apply, applyAll, busy } = section
+  const status = section.status as EggStatus
   const glass = status.eggGlassMode === true
   const lods = status.eggLodOptions
   const divider = status.eggPollingDivider
@@ -92,8 +94,10 @@ function EggSensor({ status: base, client, apply, applyAll, busy }: Section) {
     ),
     has(status.eggAngleTuning) && can(client, 'setSensorAngleTuning') && (
       <Row key="angle" label="Angle tuning">
-        <Slider label="Angle tuning" min={-127} max={127} step={1} value={status.eggAngleTuning} format={v => String(v)}
-          onCommit={v => void apply('setSensorAngleTuning', v)} disabled={busy} />
+        <AngleControl section={section}>
+          <Slider label="Angle tuning" min={-127} max={127} step={1} value={status.eggAngleTuning} format={v => String(v)}
+            onCommit={v => void apply('setSensorAngleTuning', v)} disabled={busy} />
+        </AngleControl>
       </Row>
     ),
     has(status.eggForceMaxFps) && can(client, 'setForceMaxSensorFps') && (
@@ -365,7 +369,8 @@ function OtSensor({ status: base, client, apply, busy }: Section) {
 
 const PRO_PROFILES = [1, 2, 3, 4, 5, 6].map(n => ({ value: n, label: String(n) }))
 
-function PulsarPro({ status, client, apply, busy }: Section) {
+function PulsarPro(section: Section) {
+  const { status, client, apply, busy } = section
   // Same test OpenMouse uses: only the Pulsar Pro protocol driver says this.
   if (!status.connectionDetail?.includes('Pulsar Pro protocol')) return null
   const rows = [
@@ -376,8 +381,10 @@ function PulsarPro({ status, client, apply, busy }: Section) {
     ),
     has(status.angleTuning) && can(client, 'setAngleTuning') && (
       <Row key="angle" label="Angle tuning">
-        <Slider label="Angle tuning" min={-30} max={30} step={1} value={status.angleTuning} format={v => `${v}°`}
-          onCommit={v => void apply('setAngleTuning', v)} disabled={busy} />
+        <AngleControl section={section}>
+          <Slider label="Angle tuning" min={-30} max={30} step={1} value={status.angleTuning} format={v => `${v}°`}
+            onCommit={v => void apply('setAngleTuning', v)} disabled={busy} />
+        </AngleControl>
       </Row>
     ),
     // The generic profile row needs profileCount, which this driver does not report.

@@ -1,7 +1,7 @@
 import { call, onHostEvent } from './exo-hid'
 
 /**
- * Exo's text size, motion setting and Appearance, followed live.
+ * Exo's text size, motion setting, Appearance and glass, followed live.
  *
  * Text size (Settings > General > Text size) is a factor on --exo-scale, which
  * every font size in mouse.css multiplies. Motion is Exo's `data-exo-motion`
@@ -19,17 +19,44 @@ const motion = (value: unknown) => {
   if (value === 'reduce' || value === 'full') document.documentElement.dataset.exoMotion = value
 }
 
-/** Exo's Appearance (Settings > General): mouse.css draws light, dark or void from data-exo-theme. */
-const theme = (value: unknown) => {
-  if (value === 'light' || value === 'dark' || value === 'void') document.documentElement.dataset.exoTheme = value
+/**
+ * The values mouse.css draws Exo's glass with (its page and words, a pane, a control, large glass, the hero): Exo
+ * sends its own, read off its own surfaces, as plain CSS values, and they replace mouse.css's copies for the
+ * Appearance, so the frame is Exo's current glass in every Appearance and Material. Anything else is ignored.
+ */
+const LOOK = new Set([
+  '--bg', '--ink', '--muted', '--faint', '--good', '--bad', '--primary-ink', '--primary-hover', '--track', '--hair',
+  '--pane-fill', '--pane-glass', '--pane-edge', '--line-soft', '--hover-fill', '--selected', '--pressed',
+  '--fill', '--control-glass', '--rim', '--rim-pressed', '--field-rim', '--panel-fill', '--panel-glass', '--panel-edge',
+  '--panel-ink', '--panel-muted', '--panel-hover', '--panel-selected', '--panel-pressed', '--hero-fill', '--hero-edge',
+])
+
+/** A colour, a shadow, a filter or a number: nothing that loads or ends the declaration. */
+const plain = (value: unknown): value is string => typeof value === 'string' && value.length <= 400 && !/url\(|image-set\(|[;{}\\]/i.test(value)
+
+/** Exo's Appearance (Settings > General) and its glass: mouse.css draws light, dark or void from data-exo-theme, and
+    Exo's own values for it land in the same task, so no frame shows one Appearance's glass on the other's page. */
+const theme = (value: unknown, look?: unknown) => {
+  if (value !== 'light' && value !== 'dark' && value !== 'void') return
+  const root = document.documentElement
+  root.dataset.exoTheme = value
+  if (!look || typeof look !== 'object') return
+  for (const [name, css] of Object.entries(look)) {
+    if (!LOOK.has(name)) continue
+    if (plain(css) && css) root.style.setProperty(name, css)
+    else root.style.removeProperty(name)
+  }
 }
 
 export function followHostLook() {
   if (window.parent === window) return
   call('exo.textScale').then(reply => scale(reply.data), () => { })
   call('exo.motion').then(reply => motion(reply.data), () => { })
-  call('exo.theme').then(reply => theme(reply.data), () => { })
+  call('exo.theme').then(reply => theme(reply.data, reply.look), () => { })
   onHostEvent('exo.textScale', data => scale((data as { scale?: unknown } | null)?.scale))
   onHostEvent('exo.motion', data => motion((data as { motion?: unknown } | null)?.motion))
-  onHostEvent('exo.theme', data => theme((data as { theme?: unknown } | null)?.theme))
+  onHostEvent('exo.theme', data => {
+    const sent = data as { theme?: unknown; look?: unknown } | null
+    theme(sent?.theme, sent?.look)
+  })
 }

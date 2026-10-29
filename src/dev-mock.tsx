@@ -19,13 +19,25 @@ import type { Candidate, Step, useMouse } from './mouse'
  * Viper V3 Pro on its HyperSpeed receiver instead, as a friend's reads it
  * (Razer's button controls, asymmetric lift-off, low power mode), for the
  * room with many panels. ?lamzu is a Lamzu with X and Y stored per DPI stage.
+ * ?logitech is a PRO X 3 Superstrike on its receiver running from this PC (Host mode: bunny hop as Exo last wrote
+ * it, each connection's polling rate in a game profile's sheet); with ?onboard it runs from its memory (bunny hop
+ * and button assignments with Keys in the profile), and ?blank is one G HUB never linked. ?hitscan is a Hitscan
+ * on its 8K receiver; ?ajazz an AJAZZ set never to sleep. ?wlmouse is a WLMouse Beast X with a sensor angle Exo sets
+ * (Sensor angle's Measure); ?atk an ATK F1 Ultimate, whose angle the driver reads but can't set (the measurement
+ * alone, under Tests). The Starlight X has none (the measurement alone).
  * ?core=set shows the CPU core panel after Windows' restart, with its reads before and after.
  */
 
 const params = new URLSearchParams(location.search)
 const RAZER = params.has('razer')
 const LAMZU = params.has('lamzu')
-const DEVICE = RAZER ? '1532:c1' : LAMZU ? '3554:f5f7' : '361d:200'
+const LOGITECH = params.has('logitech')
+const HITSCAN = params.has('hitscan')
+const AJAZZ = params.has('ajazz')
+const WLMOUSE = params.has('wlmouse')
+const ATK = params.has('atk')
+const DEVICE = RAZER ? '1532:c1' : LAMZU ? '3554:f5f7' : LOGITECH ? '46d:c54d' : HITSCAN ? '3770:300' : AJAZZ ? 'a8a5:2157'
+  : WLMOUSE ? '36a7:a887' : ATK ? '373b:1083' : '361d:200'
 const FIRMWARE = params.get('firmware') ?? '1.1.1'
 const OLD = FIRMWARE !== '1.1.1'
 const UNREAD = params.has('unread')
@@ -123,6 +135,146 @@ const LAMZU_START = {
   firmware: ['Mouse 1.0.6'],
 } as unknown as MouseStatus
 
+/** A PRO X 3 Superstrike: profile format 8, whose cable carries the full rates (USB id C0A9). */
+const LOGITECH_START = {
+  brand: 'Logitech',
+  name: 'PRO X 3 SUPERSTRIKE',
+  ui: { family: 'logitech-hidpp' },
+  batteryPercent: 81,
+  batteryState: 'Discharging',
+  dpi: 800,
+  pollingRateHz: 2000,
+  supportedPollingRates: [125, 250, 500, 1000, 2000, 4000, 8000],
+  activeProfile: 1,
+  unitId: null,
+  connectionType: 'Wireless',
+  connectionDetail: 'LIGHTSPEED receiver',
+  transportIds: { USB: 'C0A9' },
+  deviceMode: params.has('onboard') ? 'Onboard' : 'Host',
+  onboardProfileFormat: { id: 8, name: 'v8', base: 'v6', supported: true, verified: true, writable: true },
+  // mouse.ts fills this in on a mouse running from this PC; off until Exo writes it.
+  ...(params.has('onboard') ? {} : { hostBunnyHopMs: 0 }),
+  motionSync: null,
+  liftOffDistance: null,
+  firmware: ['MPM 25.01', 'Receiver 4.2.9'],
+} as unknown as MouseStatus
+
+/** The onboard profile the PRO X 3 runs from: bunny hop off, the side buttons as they come. */
+const action = (button: number, name: string) => ({ button, action: name, raw: [0x80, 0x01, 0x00, button + 1] })
+const LOGITECH_PROFILES = params.has('blank') ? [] : [{
+  sector: 1, name: 'Profile 1', enabled: true, bunnyHoppingMs: 0,
+  buttonAssignments: [action(0, 'Left click'), action(1, 'Right click'), action(2, 'Middle click'), action(3, 'Back'), action(4, 'Forward')],
+  gShiftAssignments: [0, 1, 2, 3, 4].map(b => action(b, 'Disabled')),
+}]
+
+function writeLogitechProfile(values: { bunnyHoppingMs?: number; buttonAssignments?: { layer: string; button: number; binding: string | { kind: string; key: number; modifiers: number } }[] }) {
+  const profile = LOGITECH_PROFILES[0]
+  if (!profile) return
+  if (values.bunnyHoppingMs !== undefined) profile.bunnyHoppingMs = values.bunnyHoppingMs
+  for (const { layer, button, binding } of values.buttonAssignments ?? []) {
+    const list = layer === 'primary' ? profile.buttonAssignments : profile.gShiftAssignments
+    list[button] = typeof binding === 'string' ? action(button, binding)
+      : { button, action: 'Custom', raw: [0x80, 0x02, binding.modifiers, binding.key] }
+  }
+}
+
+/** A Hitscan on its 8K receiver, as its driver reads one (not yet run on hardware). */
+const HITSCAN_START = {
+  brand: 'Hitscan',
+  name: 'Hitscan Hyperlight',
+  ui: {
+    family: 'hitscan', hideUnsupportedPollingRates: true, hideSignalCard: true, hideSleepCard: true, showAdvancedSection: true, forceShowBattery: true,
+    dpiStageEditor: { maxStages: 4, countEditable: true, minDpi: 50, maxDpi: 26_000, stepDpi: 50 },
+  },
+  batteryPercent: 64,
+  batteryState: 'Discharging',
+  dpi: 800,
+  dpiStages: [400, 800, 1600, 3200],
+  dpiStageColors: ['#ff0000', '#00ff00', '#0000ff', '#ffffff'],
+  activeDpiStage: 1,
+  pollingRateHz: 4000,
+  supportedPollingRates: [125, 250, 500, 1000, 2000, 4000, 8000],
+  activeProfile: null,
+  unitId: null,
+  connectionType: 'Wireless',
+  connectionDetail: '8K receiver',
+  debounceMs: 4,
+  liftOffDistance: 'Low',
+  supportedLiftOffDistances: ['Low', 'High'],
+  motionSync: true,
+  angleSnapping: false,
+  rippleControl: false,
+  buttonMappings: { Left: 'Left Click', Right: 'Right Click', Middle: 'Middle Click', Back: 'Backward', Forward: 'Forward', DPI: 'DPI Loop' },
+  fixedButtons: ['Left'],
+  buttonOptions: ['Left Click', 'Right Click', 'Middle Click', 'Backward', 'Forward', 'DPI Loop', 'DPI+', 'DPI-', 'Polling Rate Switch', 'Disable'],
+  firmware: ['Mouse 1.0.2'],
+} as unknown as MouseStatus
+
+/** An AJAZZ NJ07 set never to sleep, which 0.48 reads as 0 (it read as unknown before). */
+const AJAZZ_START = {
+  brand: 'AJAZZ',
+  name: 'AJAZZ NJ07',
+  ui: { family: 'ajazz', hideUnsupportedPollingRates: true, hideProcessingCard: true, hideSignalCard: true,
+    dpiStageEditor: { maxStages: 6, countEditable: false, minDpi: 50, maxDpi: 12_800, stepDpi: 50 } },
+  batteryPercent: 90,
+  batteryState: 'Discharging',
+  dpi: 800,
+  dpiStages: [400, 800, 1600, 3200, 6400, 12_800],
+  activeDpiStage: 1,
+  pollingRateHz: 1000,
+  supportedPollingRates: [125, 250, 500, 1000],
+  activeProfile: null,
+  connectionType: 'Wireless',
+  connectionDetail: '2.4 GHz receiver',
+  liftOffDistance: null,
+  sleepTimeout: 0,
+  firmware: ['NJ07 1.0.4'],
+} as unknown as MouseStatus
+
+/** A WLMouse Beast X on its receiver: a sensor angle in whole degrees, -30 to 30, that its driver sets. */
+const WLMOUSE_START = {
+  brand: 'WLMouse',
+  name: 'WLMouse Beast X',
+  ui: {},
+  batteryPercent: 71,
+  batteryState: 'Discharging',
+  dpi: 800,
+  pollingRateHz: 1000,
+  supportedPollingRates: [125, 250, 500, 1000, 2000, 4000, 8000],
+  activeProfile: null,
+  connectionType: 'Wireless',
+  connectionDetail: '2.4 GHz receiver',
+  motionSync: true,
+  angleSnapping: false,
+  angleTuning: 0,
+  liftOffDistance: 'Low',
+  supportedLiftOffDistances: ['Low', 'Medium', 'High'],
+  firmware: ['Mouse 1.2.3'],
+} as unknown as MouseStatus
+
+/** An ATK F1 Ultimate: OpenMouse reads its sensor angle (register 0x00bd) but has no write for it. */
+const ATK_START = {
+  brand: 'ATK',
+  name: 'ATK F1 Ultimate',
+  ui: { family: 'atk', hideUnsupportedPollingRates: true },
+  batteryPercent: 88,
+  batteryState: 'Discharging',
+  dpi: 1600,
+  dpiStages: [800, 1600, 3200],
+  activeDpiStage: 1,
+  pollingRateHz: 1000,
+  supportedPollingRates: [125, 250, 500, 1000, 2000, 4000, 8000],
+  activeProfile: null,
+  connectionType: 'Wireless',
+  connectionDetail: '2.4 GHz receiver',
+  motionSync: false,
+  angleSnapping: false,
+  angleTuning: -3,
+  atkSensorMode: 1,
+  liftOffDistance: 'Low',
+  firmware: ['Mouse 1.0.8'],
+} as unknown as MouseStatus
+
 type Fields = Record<string, unknown>
 const SETTERS: Record<string, (s: Fields, ...a: number[]) => Fields> = {
   setDpi: (s, dpi) => ({ ...s, dpi }),
@@ -144,21 +296,49 @@ const SETTERS: Record<string, (s: Fields, ...a: number[]) => Fields> = {
   setDpiStageValue: (s, i, x) => ({ ...s, dpiStages: (s.dpiStages as number[]).map((v, j) => j === i ? x : v) }),
   setLunaFuryDpiStageAxes: (s, i, x, y) => ({ ...s, dpiStages: (s.dpiStages as number[]).map((v, j) => j === i ? x : v), dpiStagesY: (s.dpiStagesY as number[]).map((v, j) => j === i ? y : v) }),
   setLunaFurySeparateDpiAxes: (s, on) => ({ ...s, lunafury: { separateDpiAxes: !!on } }),
+  setDpiStageCount: (s, n) => ({ ...s, dpiStages: [...(s.dpiStages as number[]), 6400, 12_800, 25_600].slice(0, n) }),
+  setDebounceTime: (s, ms) => ({ ...s, debounceMs: ms }),
+  setCurrentProfile: (s, sector) => ({ ...s, activeProfile: sector }),
+  setHostBunnyHopMs: (s, ms) => { hostBunnyHop = ms; return { ...s, hostBunnyHopMs: ms } },
+  setAngleTuning: (s, deg) => ({ ...s, angleTuning: deg }),
 }
 
-/** Setters whose first argument is a name, not a number (Razer's button controls). */
+/** The Logitech's Host bunny hop as mouse.ts keeps it: what was last written. */
+let hostBunnyHop = 0
+
+/** Setters whose first argument is a name, flag or object, not a number. */
 const NAMED: Record<string, (s: Fields, ...a: unknown[]) => Fields> = {
-  setButtonMapping: (s, control, mapping) => ({ ...s, razerButtonMappings: { ...(s.razerButtonMappings as object), [control as string]: mapping } }),
+  setButtonMapping: (s, control, mapping) => s.buttonMappings
+    ? { ...s, buttonMappings: { ...(s.buttonMappings as object), [control as string]: mapping } }
+    : { ...s, razerButtonMappings: { ...(s.razerButtonMappings as object), [control as string]: mapping } },
   setToggleControl: (s, control, value) => ({ ...s, razerButtonMappings: { ...(s.razerButtonMappings as object), [control as string]: value } }),
+  setMotionSync: (s, on) => ({ ...s, motionSync: on }),
+  setAngleSnapping: (s, on) => ({ ...s, angleSnapping: on }),
+  setRippleControl: (s, on) => ({ ...s, rippleControl: on }),
+  setDpiStageColor: (s, i, color) => ({ ...s, dpiStageColors: (s.dpiStageColors as string[]).map((c, j) => j === i ? color : c) }),
+  setOnboardMode: (s, mode) => {
+    const { hostBunnyHopMs: _, ...rest } = s
+    return mode === 'Host' ? { ...rest, deviceMode: mode, hostBunnyHopMs: hostBunnyHop } : { ...rest, deviceMode: mode }
+  },
+  writeActiveProfile: (s, values) => { writeLogitechProfile(values as Parameters<typeof writeLogitechProfile>[0]); return { ...s } },
 }
 
 /** A driver client as far as `can` looks: every setter above, doing nothing itself. */
 const CLIENT = {
   ...Object.fromEntries([...Object.keys(SETTERS), ...Object.keys(NAMED)].map(name => [name, async () => undefined])),
   getLowPowerOptions: () => [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
+  readOnboardProfiles: async () => structuredClone(LOGITECH_PROFILES),
+  ...(HITSCAN ? { getDebounceMaxMs: () => 8 } : {}),
+  // ATK's driver reads the angle but has no setter.
+  ...(ATK ? { setAngleTuning: undefined } : {}),
+  ...(AJAZZ ? { getSleepOptions: () => [0, 60, 180, 300, 600, 1200, 1800, 3600] } : {}),
 } as unknown as SupportedClient
 
-const CANDIDATE = { id: DEVICE, device: {} as HIDDevice, name: RAZER ? 'Viper V3 Pro' : LAMZU ? 'Maya X' : 'Starlight X', others: [] } satisfies Candidate
+const CANDIDATE = {
+  id: DEVICE, device: {} as HIDDevice, others: [],
+  name: RAZER ? 'Viper V3 Pro' : LAMZU ? 'Maya X' : LOGITECH ? 'PRO X 3 SUPERSTRIKE' : HITSCAN ? 'Hyperlight' : AJAZZ ? 'NJ07'
+    : WLMOUSE ? 'Beast X' : ATK ? 'F1 Ultimate' : 'Starlight X',
+} satisfies Candidate
 
 const GAMES = [
   { id: 'steam:730', title: 'Counter-Strike 2' },
@@ -168,7 +348,13 @@ const GAMES = [
 ]
 
 const PROFILES = {
-  [DEVICE]: [
+  [DEVICE]: LOGITECH ? [
+    { id: 'desktop', name: 'Desktop', isDefault: true, games: [], savedAt: '2026-10-01T12:00:00Z', polling: { Wireless: 2000 },
+      steps: [['setDpi', [800]], ['setPollingRate', [2000]], ['setHostBunnyHopMs', [0]]] },
+    { id: 'tac', name: 'Tactical', games: ['steam:730', 'riot:valorant'], savedAt: '2026-10-02T12:00:00Z', polling: { Wireless: 4000, Wired: 8000 },
+      steps: [['setDpi', [400]], ['setPollingRate', [4000]], ['setHostBunnyHopMs', [150]]] },
+    { id: 'arena', name: 'Arena', games: ['steam:1172470'], savedAt: '2026-10-03T12:00:00Z', steps: [['setDpi', [1600]], ['setPollingRate', [1000]]] },
+  ] : [
     { id: 'desktop', name: 'Desktop', isDefault: true, games: [], savedAt: '2026-10-01T12:00:00Z', steps: [['setDpi', [800]]] },
     { id: 'tac', name: 'Tactical', games: ['steam:730', 'riot:valorant'], savedAt: '2026-10-02T12:00:00Z', steps: [['setDpi', [400]]] },
     { id: 'arena', name: 'Arena', games: ['steam:1172470'], savedAt: '2026-10-03T12:00:00Z', steps: [['setDpi', [1600]]] },
@@ -230,7 +416,8 @@ function look() {
 }
 
 function useMockMouse(): ReturnType<typeof useMouse> {
-  const [status, setStatus] = useState(RAZER ? RAZER_START : LAMZU ? LAMZU_START : START)
+  const [status, setStatus] = useState(RAZER ? RAZER_START : LAMZU ? LAMZU_START : LOGITECH ? LOGITECH_START : HITSCAN ? HITSCAN_START
+    : AJAZZ ? AJAZZ_START : WLMOUSE ? WLMOUSE_START : ATK ? ATK_START : START)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [readAt, setReadAt] = useState(() => Date.now() - (params.has('asleep') ? 4 * 60_000 : 0))
@@ -254,7 +441,7 @@ function useMockMouse(): ReturnType<typeof useMouse> {
   }, [])
   const apply = useCallback((method: string, ...args: unknown[]) => applyAll([[method, args]]), [applyAll])
   return {
-    phase: 'ready', candidates: [CANDIDATE], current: CANDIDATE, brand: RAZER ? 'Razer' : LAMZU ? 'LunaFury' : 'Finalmouse', status, error, busy,
+    phase: 'ready', candidates: [CANDIDATE], current: CANDIDATE, brand: status.brand, status, error, busy,
     client: CLIENT, readAt, apply, applyAll, choose: () => undefined, retry: () => undefined,
   }
 }

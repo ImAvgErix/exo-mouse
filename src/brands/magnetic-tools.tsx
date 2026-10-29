@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MagneticButtonStatus, MagneticButtonsStatus, MouseStatus } from '@openmouse/protocol/drivers/mouse-types'
 import { can, type Step } from '../mouse'
 import type { Section } from '../section'
+import { SensorAngleTest } from '../SensorAngle'
 import { Dropdown, Panel, Row, Segmented, Slider, Switch } from '../ui'
 import { ClickTest, DepthMeter, HitsSpeedTest, Overlay, PollingTest } from './magnetic-tools-tests'
 import './magnetic-tools.css'
@@ -454,11 +455,12 @@ function TestsPanel(section: Section) {
   const close = useCallback(() => setOpen(null), [])
   const run = (test: Test, name: string) => <button type="button" className="m-button" onClick={() => setOpen(test)}>{name}</button>
   // The polling and click tests live on the page, ready to use: their pads are what you test on.
-  // HITS speed needs the press stream armed, so it stays a button that opens over the room.
+  // HITS speed needs the press stream armed, so it stays a button its pad hangs from while it runs.
   return (
     <>
       <Panel title="Polling test"><PollingTest reportedHz={status.pollingRateHz || null} /></Panel>
       <Panel title="Click test"><ClickTest /></Panel>
+      <SensorAngleTest {...section} />
       {hits ? (
         <Panel title="HITS speed" actions={run('hits', 'Start')}>
           {open === 'hits' ? <HitsTest section={section} onClose={close} /> : null}

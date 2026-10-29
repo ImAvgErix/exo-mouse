@@ -7,11 +7,12 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/patch-protocol.mjs && tsc -b && vite build",
-    "check": "tsc -b && eslint src --max-warnings 0 && node scripts/css-design.mjs",
+    "check": "tsc -b && eslint src --max-warnings 0 && node scripts/css-design.mjs && node --test test/*.test.ts",
+    "test": "node --test test/*.test.ts",
     "postinstall": "node scripts/patch-protocol.mjs"
   },
   "dependencies": {
-    "@openmouse/protocol": "0.47.0",
+    "@openmouse/protocol": "0.48.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
