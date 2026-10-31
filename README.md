@@ -62,7 +62,7 @@ protocol library's drivers run unchanged.
 ## Changes to OpenMouse
 
 `scripts/patch-protocol.mjs` runs before every build and applies fixes to
-`@openmouse/protocol` 0.48.1 until upstream ships them. It stops the build when
+`@openmouse/protocol` 0.49.0 until upstream ships them. It stops the build when
 the library version changes, so a fixed release is noticed and its patch removed.
 
 ## Build

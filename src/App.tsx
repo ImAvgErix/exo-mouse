@@ -317,7 +317,7 @@ function Battery({ status }: { status: MouseStatus }) {
   return (
     <div className={`m-stat${battery <= 15 && !charging ? ' is-low' : ''}`} aria-label={`Battery ${battery}%${charging ? ', charging' : ''}`}>
       <span className="m-stat-label">Battery{detail}</span>
-      <span className="m-stat-figure">{battery}<span className="m-stat-unit">%</span></span>
+      <span className="m-stat-figure">{battery}<span className="m-stat-unit is-percent">%</span></span>
       <span className="m-gauge" aria-hidden="true">
         <span className="m-gauge-fill" style={{ '--fill': Math.max(2, Math.min(100, battery)) / 100 } as CSSProperties} />
       </span>
@@ -333,7 +333,7 @@ function Signal({ status }: { status: MouseStatus }) {
   const dbm = DBM.exec(status.connectionDetail ?? '')?.[1]
   return (
     <div className={`m-stat${level <= 0.25 ? ' is-low' : ''}`} aria-label={`Signal ${signalWord(level).toLowerCase()}${dbm ? `, ${dbm} dBm` : ''}`}>
-      <span className="m-stat-label">Signal{dbm ? <span className="m-stat-detail">{dbm} dBm</span> : null}</span>
+      <span className="m-stat-label">Signal{dbm ? <span className="m-stat-detail">{dbm.replace('-', '−')} dBm</span> : null}</span>
       <span className="m-stat-figure">{signalWord(level)}</span>
       <span className="m-gauge is-steps" aria-hidden="true">
         {[1, 2, 3, 4].map(i => <span key={i} className={`m-gauge-step${i <= bars ? ' is-on' : ''}`} />)}

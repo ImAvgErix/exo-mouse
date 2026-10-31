@@ -192,13 +192,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   grid-template-columns: minmax(280px, 1fr) var(--settings-w, minmax(0, 2fr));
   gap: var(--gap);
   height: 100%;
-  /* Exo's rooms' frame: 12px under the Bar, the 24px gutter. */
-  padding: 12px 24px 16px;
+  /* Exo's rooms' frame: 12px under the Bar, its sides on the Bar's edge (Exo's 10px gutter). */
+  padding: 12px 10px 16px;
 }
 
 /* A short room: a little less air around it. */
 @media (max-height: 760px) {
-  .m-room { padding: 12px 24px 12px; }
+  .m-room { padding: 12px 10px 12px; }
 }
 
 /* The hero: one card, the picture taking all the height its readout leaves; the page with one hairline, as the heroes
@@ -222,11 +222,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 16px 16px 0;
 }
 
+/* Its top corners are the hero's own (18px): at 14px the done check's green line and dimming were cut off by the hero's
+   rounder corner, their arcs not meeting its edge. */
 .m-hero-art {
   position: relative;
   flex: 1 1 auto;
   min-height: 120px;
-  border-radius: 14px 14px 0 0;
+  border-radius: 18px 18px 0 0;
   overflow: hidden;
 }
 
@@ -332,6 +334,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: var(--type-body);
 }
 
+/* A percent sits on its figure ("91%"), as the Bar and the device cards write it; Hz keeps its space. */
+.m-stat-unit.is-percent { margin-left: 0; }
+
 .m-stat.is-low .m-stat-figure { color: var(--bad); }
 
 /* The hero's foot: thanks to OpenMouse's maker, with a red heart. */
@@ -433,7 +438,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   }
 
   .m-hero-pick { grid-column: 1 / -1; }
-  .m-hero-art { grid-row: span 2; min-height: 180px; border-radius: 14px 0 0 14px; }
+  .m-hero-art { grid-row: span 2; min-height: 180px; border-radius: 18px 0 0 18px; }
   .m-hero-id { grid-column: 2; }
   .m-stats { grid-column: 2; }
   .m-credit { grid-column: 1 / -1; }
